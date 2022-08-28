@@ -1,21 +1,22 @@
 #![allow(dead_code)]
 use crate::oklab;
 
-pub struct RGB<T> {
+#[derive(Copy, Clone, Debug)]
+pub struct Rgb<T> {
     pub r: T,
     pub g: T,
     pub b: T,
 }
 
-pub type SRGB = RGB<u8>;
-pub type LRGB = RGB<f32>;
+pub type SRgb = Rgb<u8>;
+pub type LRgb = Rgb<f64>;
 
-impl RGB<u8> {
-    pub fn srgb_to_lrgb(self) -> LRGB {
-        RGB {
-            r: to_linear(self.r as f32 / 255.0),
-            g: to_linear(self.g as f32 / 255.0),
-            b: to_linear(self.b as f32 / 255.0),
+impl Rgb<u8> {
+    pub fn srgb_to_lrgb(self) -> LRgb {
+        Rgb {
+            r: to_linear(self.r as f64 / 255.0),
+            g: to_linear(self.g as f64 / 255.0),
+            b: to_linear(self.b as f64 / 255.0),
         }
     }
 
@@ -24,12 +25,12 @@ impl RGB<u8> {
     }
 }
 
-impl RGB<f32> {
-    pub fn lrgb_to_srgb(self) -> SRGB {
-        RGB {
-            r: ((255.0 * to_gamma(self.r)).round()).clamp(0.0,255.0) as u8,
-            g: ((255.0 * to_gamma(self.g)).round()).clamp(0.0,255.0) as u8,
-            b: ((255.0 * to_gamma(self.b)).round()).clamp(0.0,255.0) as u8,
+impl Rgb<f64> {
+    pub fn lrgb_to_srgb(self) -> SRgb {
+        Rgb {
+            r: ((255.0 * to_gamma(self.r)).round()).clamp(0.0, 255.0) as u8,
+            g: ((255.0 * to_gamma(self.g)).round()).clamp(0.0, 255.0) as u8,
+            b: ((255.0 * to_gamma(self.b)).round()).clamp(0.0, 255.0) as u8,
         }
     }
 
@@ -41,14 +42,14 @@ impl RGB<f32> {
         let m_ = m.cbrt();
         let s_ = s.cbrt();
         oklab::Oklab {
-            l: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
-            a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
-            b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_,
+            l: 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
+            a: 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
+            b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_,
         }
     }
 }
 
-fn to_linear(u: f32) -> f32 {
+fn to_linear(u: f64) -> f64 {
     if u >= 0.04045 {
         ((u + 0.055) / (1.055)).powf(2.4)
     } else {
@@ -56,7 +57,7 @@ fn to_linear(u: f32) -> f32 {
     }
 }
 
-fn to_gamma(u: f32) -> f32 {
+fn to_gamma(u: f64) -> f64 {
     if u >= 0.0031308 {
         1.055 * u.powf(1.0 / 2.4) - 0.055
     } else {
