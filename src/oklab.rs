@@ -27,9 +27,61 @@ impl Oklab {
         self.oklab_to_lrgb().lrgb_to_srgb()
     }
 
-    pub fn oklab_difference(self, other: Oklab) -> f64 {
-        // Euclidian distance as Oklab is supposed to be orthogonal
-        ((self.l - other.l).powi(2) + (self.a - other.a).powi(2) + (self.b - other.b).powi(2))
+    pub fn oklab_to_oklch(self) -> Oklch {
+        Oklch {
+            l: self.l,
+            c: self.a.hypot(self.b),
+            h: self.b.atan2(self.a),
+        }
+    }
+
+    pub fn delta_l(self, other: Oklab) -> f64 {
+        self.l - other.l
+    }
+    pub fn delta_a(self, other: Oklab) -> f64 {
+        self.a - other.a
+    }
+    pub fn delta_b(self, other: Oklab) -> f64 {
+        self.b - other.b
+    }
+    pub fn delta_c(self, other: Oklab) -> f64 {
+        self.a.hypot(self.b) - other.a.hypot(other.b)
+    }
+    pub fn delta_h(self, other: Oklab) -> f64 {
+        // Idea from svgeesus, being that we're finding the length of the angular arc between these two colors
+        (self.delta_a(other).powi(2) + self.delta_b(other).powi(2) - self.delta_c(other).powi(2))
             .sqrt()
+    }
+
+    pub fn delta_eok(self, other: Oklab) -> f64 {
+        // Color difference formula
+        // svgeesus' idea was to use the delta_l, delta_c, and delta_h functions, but it reduces to a normal Euclidian distance
+        (self.delta_l(other).powi(2) + self.delta_a(other).powi(2) + self.delta_b(other).powi(2))
+            .sqrt()
+    }
+
+    /*
+    fn delta_eok_original(self, other: Oklab) -> f64 {
+        // Here for posterity
+        // Do not use as delta_h() can give you NaN, messing up fold() operations
+        (self.delta_l(other).powi(2) + self.delta_c(other).powi(2) + self.delta_h(other).powi(2)).sqrt()
+    }
+    */
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Oklch {
+    pub l: f64,
+    pub c: f64,
+    pub h: f64,
+}
+
+impl Oklch {
+    pub fn oklch_to_oklab(self) -> Oklab {
+        Oklab {
+            l: self.l,
+            a: self.c * self.h.cos(),
+            b: self.c * self.h.sin(),
+        }
     }
 }

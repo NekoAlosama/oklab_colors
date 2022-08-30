@@ -23,6 +23,10 @@ impl Rgb<u8> {
     pub fn srgb_to_oklab(self) -> oklab::Oklab {
         self.srgb_to_lrgb().lrgb_to_oklab()
     }
+
+    pub fn srgb_to_oklch(self) -> oklab::Oklch {
+        self.srgb_to_lrgb().lrgb_to_oklab().oklab_to_oklch()
+    }
 }
 
 impl Rgb<f64> {
