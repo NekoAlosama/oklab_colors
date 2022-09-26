@@ -54,10 +54,15 @@ impl Oklab {
     }
 
     pub fn delta_eok(self, other: Oklab) -> f64 {
-        // Color difference formula
-        // svgeesus' idea was to use the delta_l, delta_c, and delta_h functions, but it reduces to a normal Euclidian distance
+        // Euclidian distance color difference formula
+        // svgeesus' idea was to use the delta_l, delta_c, and delta_h functions, but it reduces to this anyways
         (self.delta_l(other).powi(2) + self.delta_a(other).powi(2) + self.delta_b(other).powi(2))
             .sqrt()
+    }
+    pub fn delta_hyab(self, other: Oklab) -> f64 {
+        // Hybrid delta_l and Euclidan distance formula
+        // Studied to be better than delta_eok for large color differences in CIELAB
+        self.delta_l(other).abs() + self.delta_a(other).hypot(self.delta_b(other))
     }
 
     /*
