@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use crate::oklab;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Rgb<T> {
     pub r: T,
     pub g: T,

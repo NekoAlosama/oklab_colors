@@ -50,6 +50,7 @@ impl Oklab {
     pub fn delta_h(self, other: Oklab) -> f64 {
         // Idea from svgeesus, being that we're finding the length of the angular arc between these two colors
         (self.delta_a(other).powi(2) + self.delta_b(other).powi(2) - self.delta_c(other).powi(2))
+            .abs() // Absolute value since value might be negative because of subtraction
             .sqrt()
     }
 
@@ -59,17 +60,13 @@ impl Oklab {
         (self.delta_l(other).powi(2) + self.delta_a(other).powi(2) + self.delta_b(other).powi(2))
             .sqrt()
     }
-    pub fn delta_hyab(self, other: Oklab) -> f64 {
-        // Hybrid delta_l and Euclidan distance formula
-        // Studied to be better than delta_eok for large color differences in CIELAB
-        self.delta_l(other).abs() + self.delta_a(other).hypot(self.delta_b(other))
-    }
 
     /*
-    fn delta_eok_original(self, other: Oklab) -> f64 {
-        // Here for posterity
-        // Do not use as delta_h() can give you NaN, messing up fold() operations
-        (self.delta_l(other).powi(2) + self.delta_c(other).powi(2) + self.delta_h(other).powi(2)).sqrt()
+    pub fn delta_eok_original(self, other: Oklab) -> f64 {
+        // Here for posterity, is slower than delta_eok()
+        // svgeesus' idea was to use this, but it reduces to delta_eok() anyways
+        (self.delta_l(other).powi(2) + self.delta_c(other).powi(2) + self.delta_h(other).powi(2))
+            .sqrt()
     }
     */
 }
@@ -90,3 +87,4 @@ impl Oklch {
         }
     }
 }
+
