@@ -8,7 +8,7 @@ mod oklab;
 mod rgb;
 
 fn main() {
-    let mut start_time = std::time::SystemTime::now();
+    let start_time = std::time::SystemTime::now();
 
     let background = SRgb { r: 0, g: 0, b: 0 }.srgb_to_oklab();
 
@@ -21,31 +21,33 @@ fn main() {
         }
     }
 
-    let mut lowest = f64::MIN;
-    let mut saved: (Oklab, Oklab, f64, f64) = (
-        Oklab {
-            l: f64::NAN,
-            a: f64::NAN,
-            b: f64::NAN,
-        },
-        Oklab {
-            l: f64::NAN,
-            a: f64::NAN,
-            b: f64::NAN,
-        },
-        f64::MIN,
-        f64::MIN,
-    );
+    let lowest = std::sync::Mutex::new(f64::MIN);
+    let saved = std::sync::Mutex::new({
+        (
+            Oklab {
+                l: f64::NAN,
+                a: f64::NAN,
+                b: f64::NAN,
+            },
+            Oklab {
+                l: f64::NAN,
+                a: f64::NAN,
+                b: f64::NAN,
+            },
+            f64::MIN,
+            f64::MIN,
+        )
+    });
 
-    let mut best_colors = srgb_colors.clone().into_par_iter().map(|color1| {
+    srgb_colors.clone().into_par_iter().for_each(|color1| {
         srgb_colors
             .clone()
             .into_par_iter()
             .map(|color2| compute_job(background, color1, color2))
-            .for_each_with((lowest, saved), |ini, item| {
-                if item.2 > ini.0 {
-                    ini.0 = item.2;
-                    ini.1 = item;
+            .for_each(|item| {
+                if item.2 > *lowest.lock().unwrap() {
+                    *lowest.lock().unwrap() = item.2;
+                    *saved.lock().unwrap() = item;
                 }
             })
     });
@@ -61,9 +63,9 @@ fn main() {
 
 // c1, c2, lowest difference with each other, sum of differences
 fn compute_job(bg: Oklab, c1: Oklab, c2: Oklab) -> (Oklab, Oklab, f64, f64) {
-    let mut delta1 = c1.delta_eok(bg);
-    let mut delta2 = c2.delta_eok(bg);
-    let mut delta3 = c1.delta_eok(c2);
+    let delta1 = c1.delta_eok(bg);
+    let delta2 = c2.delta_eok(bg);
+    let delta3 = c1.delta_eok(c2);
     (
         c1,
         c2,
