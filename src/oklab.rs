@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use crate::rgb;
+use crate::rgb::*;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Oklab {
@@ -9,22 +9,87 @@ pub struct Oklab {
 }
 
 impl Oklab {
-    pub fn oklab_to_lrgb(self) -> rgb::LRgb {
+    pub fn oklab_to_lrgb(self) -> LRgb {
         let l_ = self.l + 0.3963377774 * self.a + 0.2158037573 * self.b;
         let m_ = self.l - 0.1055613458 * self.a - 0.0638541728 * self.b;
         let s_ = self.l - 0.0894841775 * self.a - 1.291485548 * self.b;
         let l = l_.powi(3);
         let m = m_.powi(3);
         let s = s_.powi(3);
-        rgb::Rgb {
+        Rgb {
             r: 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
             g: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
             b: -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
         }
     }
 
-    pub fn oklab_to_srgb(self) -> rgb::SRgb {
+    pub fn oklab_to_srgb(self) -> SRgb {
         self.oklab_to_lrgb().lrgb_to_srgb()
+    }
+
+    pub fn oklab_to_srgb_closest_eok(self) -> SRgb {
+        let mut saved_delta = f64::MAX;
+        let mut saved_color = SRgb { r: 0, g: 0, b: 0 };
+
+        AllSRgb::default().map(|thing| thing.srgb_to_oklab()).for_each( |sample|{
+            let delta = self.delta_eok(sample);
+
+            if delta < saved_delta {
+                saved_delta = delta;
+                saved_color = sample.oklab_to_srgb();
+            }
+        }
+        );
+
+        saved_color
+    }
+
+    pub fn oklab_to_srgb_closest_hyab(self) -> SRgb {
+        let mut saved_delta = f64::MAX;
+        let mut saved_color = SRgb { r: 0, g: 0, b: 0 };
+
+        AllSRgb::default().map(|thing| thing.srgb_to_oklab()).for_each( |sample|{
+            let delta = self.delta_hyab(sample);
+
+            if delta < saved_delta {
+                saved_delta = delta;
+                saved_color = sample.oklab_to_srgb();
+            }
+        }
+        );
+
+        saved_color
+    }
+
+    pub fn oklab_to_srgb_clamp_c(self) -> SRgb {
+        let self_oklch = self.oklab_to_oklch();
+        let mut mult = 0.5;
+
+        for exp in 2..=52 {
+            let sample = Oklch {
+                c: self_oklch.c * mult,
+                ..self_oklch
+            }
+            .oklch_to_oklab()
+            .oklab_to_lrgb();
+
+            // Within 1/4th of a pixel value, probably fine for this purpose
+            // f64::EPSILON is too strict 
+            if sample.min() < -1.0 / (4.0 * 255.0) || sample.min() > 1.0_f64 + 1.0 / (4.0 * 255.0) {
+                mult -= 2.0_f64.powi(-exp);
+            } else {
+                mult += 2.0_f64.powi(-exp);
+            }
+        }
+
+        let output = Oklch {
+            c: self_oklch.c * mult,
+            ..self_oklch
+        }
+        .oklch_to_oklab()
+        .oklab_to_srgb();
+
+        output
     }
 
     pub fn oklab_to_oklch(self) -> Oklch {
@@ -61,6 +126,13 @@ impl Oklab {
             .sqrt()
     }
 
+    pub fn delta_hyab(self, other: Oklab) -> f64 {
+        // Euclidian distance color difference formula
+        // svgeesus' idea was to use the delta_l, delta_c, and delta_h functions, but it reduces to this anyways
+        self.delta_l(other).abs()
+            + (self.delta_a(other).powi(2) + self.delta_b(other).powi(2)).sqrt()
+    }
+
     /*
     pub fn delta_eok_original(self, other: Oklab) -> f64 {
         // Here for posterity, is slower than delta_eok()
@@ -69,6 +141,96 @@ impl Oklab {
             .sqrt()
     }
     */
+}
+
+use std::ops::{Add, Div, Mul, Sub};
+impl Add<Oklab> for Oklab {
+    type Output = Oklab;
+
+    fn add(self, other: Oklab) -> Oklab {
+        Oklab {
+            l: self.l + other.l,
+            a: self.a + other.a,
+            b: self.b + other.b,
+        }
+    }
+}
+impl Add<f64> for Oklab {
+    type Output = Oklab;
+
+    fn add(self, other: f64) -> Oklab {
+        Oklab {
+            l: self.l + other,
+            a: self.a + other,
+            b: self.b + other,
+        }
+    }
+}
+impl Sub<Oklab> for Oklab {
+    type Output = Oklab;
+
+    fn sub(self, other: Oklab) -> Oklab {
+        Oklab {
+            l: self.l - other.l,
+            a: self.a - other.a,
+            b: self.b - other.b,
+        }
+    }
+}
+impl Sub<f64> for Oklab {
+    type Output = Oklab;
+
+    fn sub(self, other: f64) -> Oklab {
+        Oklab {
+            l: self.l - other,
+            a: self.a - other,
+            b: self.b - other,
+        }
+    }
+}
+impl Mul<Oklab> for Oklab {
+    type Output = Oklab;
+
+    fn mul(self, other: Oklab) -> Oklab {
+        Oklab {
+            l: self.l * other.l,
+            a: self.a * other.a,
+            b: self.b * other.b,
+        }
+    }
+}
+impl Mul<f64> for Oklab {
+    type Output = Oklab;
+
+    fn mul(self, other: f64) -> Oklab {
+        Oklab {
+            l: self.l * other,
+            a: self.a * other,
+            b: self.b * other,
+        }
+    }
+}
+impl Div<Oklab> for Oklab {
+    type Output = Oklab;
+
+    fn div(self, other: Oklab) -> Oklab {
+        Oklab {
+            l: self.l / other.l,
+            a: self.a / other.a,
+            b: self.b / other.b,
+        }
+    }
+}
+impl Div<f64> for Oklab {
+    type Output = Oklab;
+
+    fn div(self, other: f64) -> Oklab {
+        Oklab {
+            l: self.l / other,
+            a: self.a / other,
+            b: self.b / other,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -85,5 +247,9 @@ impl Oklch {
             a: self.c * self.h.cos(),
             b: self.c * self.h.sin(),
         }
+    }
+
+    pub fn oklch_to_srgb(self) -> SRgb {
+        self.oklch_to_oklab().oklab_to_srgb()
     }
 }
