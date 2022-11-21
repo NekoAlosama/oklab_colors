@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 use crate::rgb::*;
+use parking_lot::{Mutex, RwLock};
+use rayon::prelude::*;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Oklab {
@@ -24,72 +26,9 @@ impl Oklab {
     }
 
     pub fn oklab_to_srgb(self) -> SRgb {
+        // RGB clipping
+        // You might want to use the other oklab_to_srgb_* functions
         self.oklab_to_lrgb().lrgb_to_srgb()
-    }
-
-    pub fn oklab_to_srgb_closest_eok(self) -> SRgb {
-        let mut saved_delta = f64::MAX;
-        let mut saved_color = SRgb { r: 0, g: 0, b: 0 };
-
-        AllSRgb::default().map(|thing| thing.srgb_to_oklab()).for_each( |sample|{
-            let delta = self.delta_eok(sample);
-
-            if delta < saved_delta {
-                saved_delta = delta;
-                saved_color = sample.oklab_to_srgb();
-            }
-        }
-        );
-
-        saved_color
-    }
-
-    pub fn oklab_to_srgb_closest_hyab(self) -> SRgb {
-        let mut saved_delta = f64::MAX;
-        let mut saved_color = SRgb { r: 0, g: 0, b: 0 };
-
-        AllSRgb::default().map(|thing| thing.srgb_to_oklab()).for_each( |sample|{
-            let delta = self.delta_hyab(sample);
-
-            if delta < saved_delta {
-                saved_delta = delta;
-                saved_color = sample.oklab_to_srgb();
-            }
-        }
-        );
-
-        saved_color
-    }
-
-    pub fn oklab_to_srgb_clamp_c(self) -> SRgb {
-        let self_oklch = self.oklab_to_oklch();
-        let mut mult = 0.5;
-
-        for exp in 2..=52 {
-            let sample = Oklch {
-                c: self_oklch.c * mult,
-                ..self_oklch
-            }
-            .oklch_to_oklab()
-            .oklab_to_lrgb();
-
-            // Within 1/4th of a pixel value, probably fine for this purpose
-            // f64::EPSILON is too strict 
-            if sample.min() < -1.0 / (4.0 * 255.0) || sample.min() > 1.0_f64 + 1.0 / (4.0 * 255.0) {
-                mult -= 2.0_f64.powi(-exp);
-            } else {
-                mult += 2.0_f64.powi(-exp);
-            }
-        }
-
-        let output = Oklch {
-            c: self_oklch.c * mult,
-            ..self_oklch
-        }
-        .oklch_to_oklab()
-        .oklab_to_srgb();
-
-        output
     }
 
     pub fn oklab_to_oklch(self) -> Oklch {
@@ -127,8 +66,8 @@ impl Oklab {
     }
 
     pub fn delta_hyab(self, other: Oklab) -> f64 {
-        // Euclidian distance color difference formula
-        // svgeesus' idea was to use the delta_l, delta_c, and delta_h functions, but it reduces to this anyways
+        // Hybrid absolute and Euclidian distance formula
+        // Shown to be better for large color differences compared to DE2000 for CIELAB, unknown for Oklab
         self.delta_l(other).abs()
             + (self.delta_a(other).powi(2) + self.delta_b(other).powi(2)).sqrt()
     }
@@ -141,6 +80,63 @@ impl Oklab {
             .sqrt()
     }
     */
+
+    pub fn oklab_to_srgb_closest(self) -> SRgb {
+        // Finds the SRgb value that is closest to the given Oklab
+        // HyAB is shown to maintain L, but chroma and hue may shift
+
+        let saved_delta = RwLock::new(f64::MAX);
+        let saved_color = Mutex::new(SRgb { r: 0, g: 0, b: 0 });
+
+        // Despite parallelization, this is still rather slow
+        AllSRgb::default()
+            .par_bridge()
+            .map(|thing| thing.srgb_to_oklab())
+            .for_each(|sample| {
+                let delta = self.delta_hyab(sample);
+
+                if delta < *saved_delta.read() {
+                    *saved_delta.write() = delta;
+                    *saved_color.lock() = sample.oklab_to_srgb();
+                }
+            });
+
+        saved_color.into_inner()
+    }
+
+    pub fn oklab_to_srgb_clamp_c(self) -> SRgb {
+        // Finds the SRgb value that is closest to the given Oklab
+        // Chroma is restricted by a multiplier less than or equal to 1
+        // Maintains L and hue, chroma can change
+        let self_oklch = self.oklab_to_oklch();
+        let mut mult = 0.5;
+
+        for exp in 2..=52 {
+            let sample = Oklch {
+                c: self_oklch.c * mult,
+                ..self_oklch
+            }
+            .oklch_to_oklab()
+            .oklab_to_lrgb();
+
+            // Within 1/4th of a pixel value, probably fine for this purpose
+            // f64::EPSILON is too strict
+            if sample.min() < -1.0 / (4.0 * 255.0) || sample.min() > 1.0_f64 + 1.0 / (4.0 * 255.0) {
+                mult -= 2.0_f64.powi(-exp);
+            } else {
+                mult += 2.0_f64.powi(-exp);
+            }
+        }
+
+        let output = Oklch {
+            c: self_oklch.c * mult,
+            ..self_oklch
+        }
+        .oklch_to_oklab()
+        .oklab_to_srgb();
+
+        output
+    }
 }
 
 use std::ops::{Add, Div, Mul, Sub};

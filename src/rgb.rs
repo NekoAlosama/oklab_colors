@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use crate::oklab::*;
 
+// Implementation from the rgb crate, modified for personal use
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Rgb<T> {
     pub r: T,
@@ -14,6 +15,8 @@ pub struct AllSRgb {
     stop: bool,
 }
 
+// Iterator that goes over the whole RGB gamut
+// (0,0,0), (0,0,1), (0,0,2)... (0,0,255), (0,1,0)... (255,255,255), None
 impl Iterator for AllSRgb {
     type Item = SRgb;
 
