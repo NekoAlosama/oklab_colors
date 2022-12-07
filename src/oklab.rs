@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::rgb::*;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use rayon::prelude::*;
 
 #[derive(Copy, Clone, Debug)]
@@ -31,11 +31,18 @@ impl Oklab {
         self.oklab_to_lrgb().lrgb_to_srgb()
     }
 
+    pub fn chroma(self) -> f64 {
+        self.a.hypot(self.b)
+    }
+    pub fn hue(self) -> f64 {
+        // Returns hue angle
+        self.b.atan2(self.a)
+    }
     pub fn oklab_to_oklch(self) -> Oklch {
         Oklch {
             l: self.l,
-            c: self.a.hypot(self.b),
-            h: self.b.atan2(self.a),
+            c: self.chroma(),
+            h: self.hue(),
         }
     }
 
@@ -49,18 +56,26 @@ impl Oklab {
         self.b - other.b
     }
     pub fn delta_c(self, other: Oklab) -> f64 {
-        self.a.hypot(self.b) - other.a.hypot(other.b)
+        // The difference in the amount of chroma
+        // NOT the Euclidian distance between the two (a,b) pairs (see delta_h_alt)
+        self.chroma() - other.chroma()
     }
+
     pub fn delta_h(self, other: Oklab) -> f64 {
-        // Idea from svgeesus, being that we're finding the length of the angular arc between these two colors
+        // DE94 formula
+        // Returns 0.0 if using colors with no chroma (in this case, check if chroma is good enough)
         (self.delta_a(other).powi(2) + self.delta_b(other).powi(2) - self.delta_c(other).powi(2))
             .abs() // Absolute value since value might be negative because of subtraction
             .sqrt()
     }
+    pub fn relative_delta_h(self, other: Oklab) -> f64 {
+        // Seems like a hue angle difference?
+        self.delta_h(other) / (self.chroma() * other.chroma()).sqrt()
+    }
 
     pub fn delta_eok(self, other: Oklab) -> f64 {
         // Euclidian distance color difference formula
-        // svgeesus' idea was to use the delta_l, delta_c, and delta_h functions, but it reduces to this anyways
+        // Value range: 0.0 - 1.0 (black vs. white)
         (self.delta_l(other).powi(2) + self.delta_a(other).powi(2) + self.delta_b(other).powi(2))
             .sqrt()
     }
@@ -68,24 +83,18 @@ impl Oklab {
     pub fn delta_hyab(self, other: Oklab) -> f64 {
         // Hybrid absolute and Euclidian distance formula
         // Shown to be better for large color differences compared to DE2000 for CIELAB, unknown for Oklab
-        self.delta_l(other).abs()
-            + (self.delta_a(other).powi(2) + self.delta_b(other).powi(2)).sqrt()
+        // Higher weight towards L differences
+        // Value range: 0.0 - 1.178988628052311 (black vs. yellow; black vs. white gives 1.0)
+        self.delta_l(other).abs() + self.delta_a(other).hypot(self.delta_b(other))
     }
-
-    /*
-    pub fn delta_eok_original(self, other: Oklab) -> f64 {
-        // Here for posterity, is slower than delta_eok()
-        // svgeesus' idea was to use this, but it reduces to delta_eok() anyways
-        (self.delta_l(other).powi(2) + self.delta_c(other).powi(2) + self.delta_h(other).powi(2))
-            .sqrt()
-    }
-    */
 
     pub fn oklab_to_srgb_closest(self) -> SRgb {
         // Finds the SRgb value that is closest to the given Oklab
         // HyAB is shown to maintain L, but chroma and hue may shift
 
-        let saved_delta = RwLock::new(f64::MAX);
+        // TODO: find early exit to oklab_to_srgb_clamp_c or even oklab_to_srgb
+
+        let saved_delta = Mutex::new(f64::MAX);
         let saved_color = Mutex::new(SRgb { r: 0, g: 0, b: 0 });
 
         // Despite parallelization, this is still rather slow
@@ -95,8 +104,8 @@ impl Oklab {
             .for_each(|sample| {
                 let delta = self.delta_hyab(sample);
 
-                if delta < *saved_delta.read() {
-                    *saved_delta.write() = delta;
+                if delta < *saved_delta.lock() {
+                    *saved_delta.lock() = delta;
                     *saved_color.lock() = sample.oklab_to_srgb();
                 }
             });
@@ -104,38 +113,120 @@ impl Oklab {
         saved_color.into_inner()
     }
 
-    pub fn oklab_to_srgb_clamp_c(self) -> SRgb {
-        // Finds the SRgb value that is closest to the given Oklab
-        // Chroma is restricted by a multiplier less than or equal to 1
-        // Maintains L and hue, chroma can change
-        let self_oklch = self.oklab_to_oklch();
-        let mut mult = 0.5;
+    pub fn clamp_l(self) -> Oklab {
+        // Multiplier range of 0.0 to 1.0
+        let mut multiplier = 0.5;
 
-        for exp in 2..=52 {
-            let sample = Oklch {
-                c: self_oklch.c * mult,
-                ..self_oklch
+        for exp in 2..52 {
+            let test_color = Oklab {
+                l: self.l * multiplier,
+                ..self
+            }
+            .oklab_to_lrgb();
+
+            let min_channel = test_color.min();
+            let max_channel = test_color.max();
+
+            // Adjust multiplier such that it produces a color within the gamut by 0.25 units
+            if min_channel < -0.25 / 255.0 || max_channel > 1.0 + 0.25 / 255.0 {
+                multiplier -= 2.0_f64.powi(-exp);
+            } else {
+                multiplier += 2.0_f64.powi(-exp);
+            }
+        }
+
+        Oklab {
+            l: self.l * multiplier,
+            ..self
+        }
+    }
+
+    pub fn maximize_l(self) -> Oklab {
+        let mut multiplier = 1.0 + 2.0_f64.powi(52);
+
+        for exp in -51..52 {
+            let test_color = Oklab {
+                l: self.l * multiplier,
+                ..self
+            }
+            .oklab_to_lrgb();
+
+            let min_channel = test_color.min();
+            let max_channel = test_color.max();
+
+            // Adjust multiplier such that it produces a color within the gamut by 0.25 units
+            if min_channel < -0.25 / 255.0 || max_channel > 1.0 + 0.25 / 255.0 {
+                multiplier -= 2.0_f64.powi(-exp);
+            } else {
+                multiplier += 2.0_f64.powi(-exp);
+            }
+        }
+
+        Oklab {
+            l: self.l * multiplier,
+            ..self
+        }
+    }
+
+    pub fn clamp_c(self) -> Oklab {
+        let color = self.oklab_to_oklch();
+        // Multiplier range of 0.0 to 1.0
+        let mut multiplier = 0.5;
+
+        for exp in 2..52 {
+            let test_color = Oklch {
+                c: color.c * multiplier,
+                ..color
             }
             .oklch_to_oklab()
             .oklab_to_lrgb();
 
-            // Within 1/4th of a pixel value, probably fine for this purpose
-            // f64::EPSILON is too strict
-            if sample.min() < -1.0 / (4.0 * 255.0) || sample.min() > 1.0_f64 + 1.0 / (4.0 * 255.0) {
-                mult -= 2.0_f64.powi(-exp);
+            let min_channel = test_color.min();
+            let max_channel = test_color.max();
+
+            // Adjust multiplier such that it produces a color within the gamut by 0.25 units
+            if min_channel < -0.25 / 255.0 || max_channel > 1.0 + 0.25 / 255.0 {
+                multiplier -= 2.0_f64.powi(-exp);
             } else {
-                mult += 2.0_f64.powi(-exp);
+                multiplier += 2.0_f64.powi(-exp);
             }
         }
 
-        let output = Oklch {
-            c: self_oklch.c * mult,
-            ..self_oklch
+        Oklch {
+            c: color.c * multiplier,
+            ..color
         }
         .oklch_to_oklab()
-        .oklab_to_srgb();
+    }
 
-        output
+    pub fn maximize_c(self) -> Oklab {
+        let color = self.oklab_to_oklch();
+        let mut multiplier = 1.0 + 2.0_f64.powi(52);
+
+        for exp in -51..52 {
+            let test_color = Oklch {
+                c: color.c * multiplier,
+                ..color
+            }
+            .oklch_to_oklab()
+            .oklab_to_lrgb();
+
+            let min_channel = test_color.min();
+            let max_channel = test_color.max();
+
+            // Adjust multiplier such that it produces a color within the gamut by 0.25 units
+            if min_channel < -0.25 / 255.0 || max_channel > 1.0 + 0.25 / 255.0 {
+                multiplier -= 2.0_f64.powi(-exp);
+            } else {
+                multiplier += 2.0_f64.powi(-exp);
+            }
+        }
+
+        Oklch {
+            c: color.c * multiplier,
+            ..color
+        }
+        .oklch_to_oklab()
     }
 }
 

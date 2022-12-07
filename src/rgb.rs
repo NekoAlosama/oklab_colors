@@ -15,7 +15,7 @@ pub struct AllSRgb {
     stop: bool,
 }
 
-// Iterator that goes over the whole RGB gamut
+// Iterator that goes over the whole RGB gamut, starting at a particular value and continuing
 // (0,0,0), (0,0,1), (0,0,2)... (0,0,255), (0,1,0)... (255,255,255), None
 impl Iterator for AllSRgb {
     type Item = SRgb;
@@ -57,6 +57,7 @@ impl Iterator for AllSRgb {
     }
 }
 
+// Didn't implement new() since I can't really start with SRgb { r: 0, g: 0, b: -1 }
 impl Default for AllSRgb {
     fn default() -> Self {
         Self {
