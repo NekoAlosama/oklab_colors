@@ -5,7 +5,7 @@ use oklab::*;
 use rayon::prelude::*;
 use rgb::*;
 
-const COMP: f64 = std::f64::consts::PI / 6.0;
+const COMP: f64 = 1.0 / 9.0;
 fn main() {
     // Time for benchmarking purposes
     let start_time = std::time::SystemTime::now();
@@ -13,28 +13,12 @@ fn main() {
 
     // List of all colors to store, including a starting color (might be your background)
     let starting_color = SRgb { r: 0, g: 0, b: 0 };
-    let mut saved_srgb: Vec<SRgb> = vec![
-        starting_color,
-        SRgb {
-            r: 255,
-            g: 255,
-            b: 0,
-        },
-    ];
+    let mut saved_srgb: Vec<SRgb> = vec![starting_color];
 
     println!("saved_srgb: {saved_srgb:?}");
 
-    // Calculate l mean
-    let l_deltas: Vec<f64> = AllSRgb::default()
-        .par_bridge()
-        .map(|color| color.srgb_to_oklab().l)
-        .collect();
-    let l_mean = l_deltas.par_iter().sum::<f64>() / l_deltas.len() as f64;
-
-    println!("l_mean: {l_mean:?}");
-
-    // Calculate HyAB mean for starting color
-    let starting_color_deltas: Vec<f64> = AllSRgb::default()
+    // Calculate HyAB median for starting color
+    let mut starting_color_deltas: Vec<f64> = AllSRgb::default()
         .par_bridge()
         .map(|color| {
             color
@@ -42,43 +26,27 @@ fn main() {
                 .delta_hyab(starting_color.srgb_to_oklab())
         })
         .collect();
-    let starting_color_mean =
-        starting_color_deltas.par_iter().sum::<f64>() / starting_color_deltas.len() as f64;
+    
+    starting_color_deltas.par_sort_by(|a, b| a.total_cmp(b));
 
-    println!("starting_color_mean: {starting_color_mean:?}");
+    // The length of starting_color_deltas should be 2^24 (multiple of 2)
+    let starting_color_median = (starting_color_deltas[starting_color_deltas.len() / 2] + starting_color_deltas[starting_color_deltas.len() / 2 - 1]) / 2.0;
 
-    // Print second color
-    println!(
-        "1: S{:?} // 0.6: S{:?} // DE: {:?} // l: {:?}",
-        saved_srgb[1],
-        Oklab {
-            l: 0.6 * saved_srgb[1].srgb_to_oklab().l,
-            ..saved_srgb[1].srgb_to_oklab()
-        }
-        .oklab_to_srgb_closest(),
-        saved_srgb[1]
-            .srgb_to_oklab()
-            .delta_hyab(starting_color.srgb_to_oklab()),
-        saved_srgb[1].srgb_to_oklab().l
-    );
+    println!("starting_color_median: {starting_color_median:?}");
 
     // Create an iterator that pre-filters out colors based on starting_color_mean
     let filtered_values = AllSRgb::default()
         .par_bridge()
         .filter(|color| {
-            color.srgb_to_oklab().l > starting_color.srgb_to_oklab().l.max(l_mean)
-                || color.srgb_to_oklab().l < starting_color.srgb_to_oklab().l.min(l_mean)
-        })
-        .filter(|color| {
             color
                 .srgb_to_oklab()
                 .delta_hyab(starting_color.srgb_to_oklab())
-                > starting_color_mean
+                > starting_color_median
         });
 
     // Find 9 new colors
     // This produces a list of 8 well-contrasting colors and one excess color
-    for i in 2..=9 {
+    for i in 1..=9 {
         // Remake saved_srgb into an updated Vec of Oklab colors
         let saved_oklab: Vec<Oklab> = saved_srgb
             .iter()
@@ -100,8 +68,11 @@ fn main() {
 
                 // Filter out colors that are too similar in relative hue to previous saved colors
                 for saved_color in &saved_oklab {
+                    if saved_color.chroma() < 1e-5 {
+                        continue;
+                    }
                     // Haven't found a good way to automate _COMP calculation
-                    if saved_color.relative_delta_h(sample_oklab) < COMP {
+                    if saved_color.delta_h(sample_oklab) < COMP {
                         return None;
                     }
                 }
@@ -206,17 +177,15 @@ Minimum mean color difference (estimate):
 
 Median doesn't seem good since it might return as 0.0 for many colors
 
-COMP: 0.5
-saved_srgb: [Rgb { r: 0, g: 0, b: 0 }, Rgb { r: 255, g: 255, b: 0 }]
-l_mean: 0.6374367230074206
-starting_color_mean: 0.7879053739478898
+COMP: 0.1111111111111111
+saved_srgb: [Rgb { r: 0, g: 0, b: 0 }]
+starting_color_median: 0.8037688504132963
 1: SRgb { r: 255, g: 255, b: 0 } // 0.6: SRgb { r: 111, g: 134, b: 0 } // DE: 1.178988628052311 // l: 0.9679827203267873
-2: SRgb { r: 211, g: 2, b: 255 } // 0.6: SRgb { r: 99, g: 0, b: 139 } // DE: 0.8344607206863967 // l: 0.6375615559609987
-3: SRgb { r: 0, g: 202, b: 254 } // 0.6: SRgb { r: 0, g: 97, b: 142 } // DE: 0.49213886263453943 // l: 0.7804486680945886
-4: SRgb { r: 255, g: 108, b: 0 } // 0.6: SRgb { r: 146, g: 18, b: 0 } // DE: 0.424408051787352 // l: 0.7035513718039714
-5: SRgb { r: 0, g: 170, b: 0 } // 0.6: SRgb { r: 0, g: 83, b: 0 } // DE: 0.3770062120030873 // l: 0.6394486105627715
-6: SRgb { r: 255, g: 208, b: 231 } // 0.6: SRgb { r: 138, g: 97, b: 118 } // DE: 0.31135197796903935 // l: 0.9045818012261558
-7: SRgb { r: 66, g: 133, b: 255 } // 0.6: SRgb { r: 0, g: 50, b: 166 } // DE: 0.25783561185514864 // l: 0.6377244660630951
-8: SRgb { r: 8, g: 253, b: 203 } // 0.6: SRgb { r: 0, g: 129, b: 79 } // DE: 0.2505776470783697 // l: 0.8854319415597356
-
+2: SRgb { r: 174, g: 0, b: 255 } // 0.6: SRgb { r: 80, g: 0, b: 136 } // DE: 0.8856062180812202 // l: 0.5864670698235025
+3: SRgb { r: 0, g: 199, b: 253 } // 0.6: SRgb { r: 0, g: 95, b: 143 } // DE: 0.5014721255353223 // l: 0.7729993400576811
+4: SRgb { r: 255, g: 85, b: 0 } // 0.6: SRgb { r: 142, g: 0, b: 0 } // DE: 0.4614032257831019 // l: 0.6758924968256405
+5: SRgb { r: 0, g: 156, b: 0 } // 0.6: SRgb { r: 0, g: 76, b: 0 } // DE: 0.4073844489987827 // l: 0.6002254608447216
+6: SRgb { r: 255, g: 113, b: 231 } // 0.6: SRgb { r: 146, g: 0, b: 133 } // DE: 0.31319765907349356 // l: 0.7577105401372394
+7: SRgb { r: 255, g: 178, b: 52 } // 0.6: SRgb { r: 137, g: 82, b: 0 } // DE: 0.2694327778730158 // l: 0.8176745450309861
+8: SRgb { r: 78, g: 130, b: 255 } // 0.6: SRgb { r: 11, g: 47, b: 168 } // DE: 0.2569878778127984 // l: 0.6363794758253163
 */

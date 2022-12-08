@@ -68,10 +68,6 @@ impl Oklab {
             .abs() // Absolute value since value might be negative because of subtraction
             .sqrt()
     }
-    pub fn relative_delta_h(self, other: Oklab) -> f64 {
-        // Seems like a hue angle difference?
-        self.delta_h(other) / (self.chroma() * other.chroma()).sqrt()
-    }
 
     pub fn delta_eok(self, other: Oklab) -> f64 {
         // Euclidian distance color difference formula
