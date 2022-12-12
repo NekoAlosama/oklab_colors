@@ -10,6 +10,10 @@ pub struct Oklab {
     pub b: f64,
 }
 
+const K_1: f64 = 0.206;
+const K_2: f64 = 0.03;
+const K_3: f64 = (1.0 + K_1) / (1.0 + K_2);
+
 impl Oklab {
     pub fn oklab_to_lrgb(self) -> LRgb {
         let l_ = self.l + 0.3963377774 * self.a + 0.2158037573 * self.b;
@@ -29,6 +33,20 @@ impl Oklab {
         // RGB clipping
         // You might want to use the other oklab_to_srgb_* functions
         self.oklab_to_lrgb().lrgb_to_srgb()
+    }
+
+    pub fn ref_l(self) -> Oklab {
+        Oklab {
+            l: (K_3 * self.l - K_1 + ((K_3 * self.l - K_1).powi(2) + 4.0 * K_2 * K_3 * self.l).sqrt()) / 2.0,
+            ..self
+        }
+    }
+
+    pub fn unref_l(self) -> Oklab {
+        Oklab {
+            l: (self.l * (self.l + K_1)) / (K_3 * (self.l + K_2)),
+            ..self
+        }
     }
 
     pub fn chroma(self) -> f64 {
@@ -68,6 +86,17 @@ impl Oklab {
             .abs() // Absolute value since value might be negative because of subtraction
             .sqrt()
     }
+    pub fn modified_delta_h(self, other: Oklab, limit: f64) -> f64 {
+        // For self.chroma() values under limit/2.0, apply a multiplier >= 1.0 that ensures delta_h() is tangent to the circle with radius of limit
+        // Desmos graph: https://www.desmos.com/calculator/upid6zd4gz
+        if self.chroma() > limit / 2.0 {
+            self.delta_h(other)
+        } else {
+            self.delta_h(other)
+                * (limit / 2.0)
+                * (self.chroma() * (limit - self.chroma())).recip().sqrt()
+        }
+    }
 
     pub fn delta_eok(self, other: Oklab) -> f64 {
         // Euclidian distance color difference formula
@@ -86,9 +115,15 @@ impl Oklab {
 
     pub fn oklab_to_srgb_closest(self) -> SRgb {
         // Finds the SRgb value that is closest to the given Oklab
-        // HyAB is shown to maintain L, but chroma and hue may shift
+        // Using delta_hyab() produces similar results with clamp_c().oklab_to_srgb()
+        // Using delta_eok() produces similar results with plain oklab_to_srgb()
 
-        // TODO: find early exit to oklab_to_srgb_clamp_c or even oklab_to_srgb
+        // Early exit; should work
+        if self.oklab_to_lrgb().min() > -f64::EPSILON
+            && self.oklab_to_lrgb().max() < 1.0 + f64::EPSILON
+        {
+            return self.oklab_to_srgb();
+        }
 
         let saved_delta = Mutex::new(f64::MAX);
         let saved_color = Mutex::new(SRgb { r: 0, g: 0, b: 0 });
