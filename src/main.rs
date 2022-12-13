@@ -7,7 +7,6 @@ use oklab::*;
 use rayon::prelude::*;
 use rgb::*;
 
-const HUE_LIMIT: f64 = 1.0 / 8.0;
 fn main() {
     // Time for benchmarking purposes
     let start_time = std::time::SystemTime::now();
@@ -44,7 +43,7 @@ fn main() {
 
     // Find 9 new colors
     // This produces a list of 8 well-contrasting colors and one excess color
-    for i in saved_srgb.len()..=9 {
+    for i in saved_srgb.len()..=10 {
         // Remake saved_srgb into an updated Vec of Oklab colors
         let saved_oklab: Vec<Oklab> = saved_srgb
             .iter()
@@ -65,7 +64,7 @@ fn main() {
             let mut bad_hue = false;
             for saved_color in &saved_oklab {
                 if saved_color.chroma() < 0.001 {
-                    continue
+                    continue;
                 }
                 let hue_delta = sample_color.modified_delta_h(*saved_color, HUE_LIMIT);
                 if hue_delta < HUE_LIMIT {
@@ -73,11 +72,13 @@ fn main() {
                 }
             }
             if bad_hue {
-                continue
+                continue;
             }
 
-            let minimum = saved_oklab.iter().map(|color| color.delta_hyab(sample_color)).fold(f64::INFINITY, |a,b| a.min(b));
-            
+            let minimum = saved_oklab
+                .iter()
+                .map(|color| color.delta_hyab(sample_color))
+                .fold(f64::INFINITY, |a, b| a.min(b));
 
             // If the minimum is greater than max_delta_e, save it
             if minimum > max_delta_e {
@@ -104,7 +105,7 @@ fn main() {
         }
         // Print colors
         println!(
-            "{i}: S{:?} // 0.6: S{:?} // DE: {:?} // h: {:?}",
+            "{i}: S{:?} // 0.6: S{:?} // Max: {:?} // HyAB: {:?}",
             next_color,
             Oklab {
                 l: 0.6 * next_color.srgb_to_oklab().l,
@@ -113,7 +114,7 @@ fn main() {
             }
             .oklab_to_srgb_closest(),
             max_delta_e,
-            next_color.srgb_to_oklab().hue().to_degrees()
+            starting_color.srgb_to_oklab().delta_hyab(next_color.srgb_to_oklab())
         );
         saved_srgb.push(next_color);
     }
@@ -123,32 +124,38 @@ fn main() {
         start_time.elapsed().expect("Time went backwards")
     );
 }
+const HUE_LIMIT: f64 = 0.116;
 /*
-Unref l
-HUE_LIMIT: 0.125
-starting_color_mean: 0.7879053739478827
-1: SRgb { r: 255, g: 255, b: 0 } // 0.6: SRgb { r: 111, g: 134, b: 0 } // DE: 1.178988628052311 // h: 109.76923207652123
-2: SRgb { r: 174, g: 0, b: 255 } // 0.6: SRgb { r: 80, g: 0, b: 136 } // DE: 0.8856062180812202 // h: -51.8110285246878
-3: SRgb { r: 0, g: 199, b: 253 } // 0.6: SRgb { r: 0, g: 95, b: 143 } // DE: 0.5014721255353223 // h: -133.74884182364494
-4: SRgb { r: 255, g: 85, b: 0 } // 0.6: SRgb { r: 142, g: 0, b: 0 } // DE: 0.4614032257831019 // h: 38.802219180008635
-5: SRgb { r: 0, g: 158, b: 58 } // 0.6: SRgb { r: 0, g: 78, b: 0 } // DE: 0.37367903577350975 // h: 147.26419797664468
-6: SRgb { r: 255, g: 106, b: 225 } // 0.6: SRgb { r: 144, g: 0, b: 128 } // DE: 0.2999683183101105 // h: -23.809004271116358
-7: SRgb { r: 0, g: 77, b: 255 } // 0.6: SRgb { r: 1, g: 0, b: 155 } // DE: 0.2852811203526471 // h: -96.791396671289
-8: SRgb { r: 239, g: 0, b: 105 } // 0.6: SRgb { r: 119, g: 0, b: 54 } // DE: 0.19355276274631286 // h: 7.28989281128492
+// Bordering on 8 and 9, generating 8
+// Interpretation: 7 good colors, 8th can be thrown away and is probably bad
+HUE_LIMIT: 0.118
+starting_color_mean: 0.7879053739478883
+1: SRgb { r: 255, g: 255, b: 0 } // 0.6: SRgb { r: 111, g: 134, b: 0 } // Max: 1.178988628052311 // HyAB: 1.178988628052311
+2: SRgb { r: 174, g: 0, b: 255 } // 0.6: SRgb { r: 80, g: 0, b: 136 } // Max: 0.8856062180812202 // HyAB: 0.8859335093126509
+3: SRgb { r: 0, g: 199, b: 253 } // 0.6: SRgb { r: 0, g: 95, b: 143 } // Max: 0.5014721255353223 // HyAB: 0.9211634598867131
+4: SRgb { r: 255, g: 85, b: 0 } // 0.6: SRgb { r: 142, g: 0, b: 0 } // Max: 0.4614032257831019 // HyAB: 0.8933626557356829
+5: SRgb { r: 0, g: 154, b: 24 } // 0.6: SRgb { r: 0, g: 75, b: 0 } // Max: 0.4077417242727185 // HyAB: 0.791179843028626
+6: SRgb { r: 255, g: 114, b: 229 } // 0.6: SRgb { r: 147, g: 0, b: 130 } // Max: 0.30987847887930103 // HyAB: 0.9724467496544608
+7: SRgb { r: 0, g: 77, b: 255 } // 0.6: SRgb { r: 0, g: 0, b: 156 } // Max: 0.2852811203526471 // HyAB: 0.7881235684518256
+8: SRgb { r: 214, g: 0, b: 96 } // 0.6: SRgb { r: 106, g: 0, b: 45 } // Max: 0.23773035817250346 // HyAB: 0.7881277825144696
 
-ref l
-HUE_LIMIT: 0.125
-starting_color_mean: 0.7307655970066169
-1: SRgb { r: 255, g: 255, b: 0 } // 0.6: SRgb { r: 110, g: 133, b: 1 } // DE: 1.1737103045344182 // h: 109.76923207652123
-2: SRgb { r: 211, g: 0, b: 255 } // 0.6: SRgb { r: 86, g: 0, b: 122 } // DE: 0.8875289083953799 // h: -41.833273670169426
-3: SRgb { r: 0, g: 203, b: 255 } // 0.6: SRgb { r: 0, g: 91, b: 135 } // DE: 0.5191545411474303 // h: -135.14519096706556
-4: SRgb { r: 255, g: 109, b: 0 } // 0.6: SRgb { r: 135, g: 6, b: 0 } // DE: 0.4379697498162304 // h: 45.76743698511026
-5: SRgb { r: 0, g: 159, b: 57 } // 0.6: SRgb { r: 0, g: 67, b: 0 } // DE: 0.40181576040365546 // h: 147.03085571603728
-6: SRgb { r: 31, g: 97, b: 255 } // 0.6: SRgb { r: 0, g: 0, b: 142 } // DE: 0.351629097841953 // h: -96.62887816156278
-7: SRgb { r: 218, g: 0, b: 100 } // 0.6: SRgb { r: 90, g: 0, b: 40 } // DE: 0.3044377965509537 // h: 5.534677087704015
-8: SRgb { r: 124, g: 0, b: 249 } // 0.6: SRgb { r: 35, g: 0, b: 110 } // DE: 0.18896369394240975 // h: -66.34100959082532
+// Trying to border on 9 and 10, generating 10+
+// Interpretation: 8 good colors, 9th+ can be thrown away and is probably bad
+HUE_LIMIT: 0.116
+starting_color_mean: 0.7879053739478904
+1: SRgb { r: 255, g: 255, b: 0 } // 0.6: SRgb { r: 111, g: 134, b: 0 } // Max: 1.178988628052311 // HyAB: 1.178988628052311
+2: SRgb { r: 174, g: 0, b: 255 } // 0.6: SRgb { r: 80, g: 0, b: 136 } // Max: 0.8856062180812202 // HyAB: 0.8859335093126509
+3: SRgb { r: 0, g: 199, b: 253 } // 0.6: SRgb { r: 0, g: 95, b: 143 } // Max: 0.5014721255353223 // HyAB: 0.9211634598867131
+4: SRgb { r: 255, g: 85, b: 0 } // 0.6: SRgb { r: 142, g: 0, b: 0 } // Max: 0.4614032257831019 // HyAB: 0.8933626557356829
+5: SRgb { r: 0, g: 152, b: 3 } // 0.6: SRgb { r: 0, g: 74, b: 0 } // Max: 0.41538630926588854 // HyAB: 0.7886925924459887
+6: SRgb { r: 255, g: 113, b: 231 } // 0.6: SRgb { r: 146, g: 0, b: 133 } // Max: 0.31319765907349356 // HyAB: 0.9750673383555444
+7: SRgb { r: 0, g: 77, b: 255 } // 0.6: SRgb { r: 1, g: 0, b: 155 } // Max: 0.2852811203526471 // HyAB: 0.7881235684518256
+8: SRgb { r: 255, g: 172, b: 10 } // 0.6: SRgb { r: 137, g: 78, b: 0 } // Max: 0.25508502658009513 // HyAB: 0.9745717763341601
+// excess
+9: SRgb { r: 23, g: 255, b: 226 } // 0.6: SRgb { r: 0, g: 130, b: 96 } // Max: 0.24480186166388457 // HyAB: 1.0575240560137602
+10: SRgb { r: 214, g: 0, b: 100 } // 0.6: SRgb { r: 106, g: 0, b: 49 } // Max: 0.2423818670471716 // HyAB: 0.7900694037994571
+
 */
-
 
 /*
 Notes:

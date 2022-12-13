@@ -37,7 +37,9 @@ impl Oklab {
 
     pub fn ref_l(self) -> Oklab {
         Oklab {
-            l: (K_3 * self.l - K_1 + ((K_3 * self.l - K_1).powi(2) + 4.0 * K_2 * K_3 * self.l).sqrt()) / 2.0,
+            l: (K_3 * self.l - K_1
+                + ((K_3 * self.l - K_1).powi(2) + 4.0 * K_2 * K_3 * self.l).sqrt())
+                / 2.0,
             ..self
         }
     }
