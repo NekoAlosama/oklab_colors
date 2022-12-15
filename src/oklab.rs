@@ -88,17 +88,6 @@ impl Oklab {
             .abs() // Absolute value since value might be negative because of subtraction
             .sqrt()
     }
-    pub fn modified_delta_h(self, other: Oklab, limit: f64) -> f64 {
-        // For self.chroma() values under limit/2.0, apply a multiplier >= 1.0 that ensures delta_h() is tangent to the circle with radius of limit
-        // Desmos graph: https://www.desmos.com/calculator/upid6zd4gz
-        if self.chroma() > limit / 2.0 {
-            self.delta_h(other)
-        } else {
-            self.delta_h(other)
-                * (limit / 2.0)
-                * (self.chroma() * (limit - self.chroma())).recip().sqrt()
-        }
-    }
 
     pub fn delta_eok(self, other: Oklab) -> f64 {
         // Euclidian distance color difference formula
