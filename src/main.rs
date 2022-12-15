@@ -48,13 +48,14 @@ fn main() {
     // Create an iterator that pre-filters out colors based on starting_color_mean and l_mean
     let filtered_values = AllSRgb::default()
         .par_bridge()
+        /* 
         .filter(|color| {
             color
                 .srgb_to_oklab()
                 .delta_l(starting_color.srgb_to_oklab())
                 .abs()
                 > l_mean
-        })
+        })*/
         .filter(|color| {
             color
                 .srgb_to_oklab()
@@ -150,7 +151,7 @@ fn main() {
         start_time.elapsed().expect("Time went backwards")
     );
 }
-const HUE_LIMIT: f64 = 0.5;
+const HUE_LIMIT: f64 = 0.54;
 /*
 // Interpretation for generated results: last color is bad
 // w/ light filter
@@ -170,19 +171,20 @@ Enough for only 9 colors
 Total time: 74.3195219s
 
 // w/o light filter
-HUE_LIMIT: 0.5
-starting_color_mean: 0.7879053739478853
+HUE_LIMIT: 0.54
+starting_color_mean: 0.7879053739478898
+l_mean: 0.6374367230074157
 1: SRgb { r: 255, g: 255, b: 0 } // 0.6: SRgb { r: 128, g: 128, b: 0 } // Max: 1.178988628052311 // HyAB: 1.178988628052311
 2: SRgb { r: 174, g: 0, b: 255 } // 0.6: SRgb { r: 85, g: 0, b: 128 } // Max: 0.8856062180812202 // HyAB: 0.8859335093126509
 3: SRgb { r: 0, g: 199, b: 253 } // 0.6: SRgb { r: 0, g: 98, b: 127 } // Max: 0.5014721255353223 // HyAB: 0.9211634598867131
 4: SRgb { r: 255, g: 85, b: 0 } // 0.6: SRgb { r: 128, g: 38, b: 0 } // Max: 0.4614032257831019 // HyAB: 0.8933626557356829
 5: SRgb { r: 0, g: 152, b: 0 } // 0.6: SRgb { r: 0, g: 74, b: 0 } // Max: 0.4157467762816877 // HyAB: 0.7892901961808592
-6: SRgb { r: 255, g: 167, b: 198 } // 0.6: SRgb { r: 128, g: 82, b: 98 } // Max: 0.285460463564134 // HyAB: 0.9331570602230008
-7: SRgb { r: 0, g: 77, b: 255 } // 0.6: SRgb { r: 0, g: 34, b: 128 } // Max: 0.2852811203526471 // HyAB: 0.7881235684518256
-8: SRgb { r: 255, g: 55, b: 212 } // 0.6: SRgb { r: 128, g: 22, b: 105 } // Max: 0.26284531429500724 // HyAB: 0.9686282489042283
-9: SRgb { r: 2, g: 255, b: 211 } // 0.6: SRgb { r: 0, g: 128, b: 105 } // Max: 0.2602915774125638 // HyAB: 1.0617144905744604
-10: SRgb { r: 239, g: 164, b: 0 } // 0.6: SRgb { r: 120, g: 80, b: 0 } // Max: 0.22829893926118808 // HyAB: 0.9344509319987477
-Total time: 70.9838603s
+6: SRgb { r: 0, g: 77, b: 255 } // 0.6: SRgb { r: 0, g: 34, b: 128 } // Max: 0.2852811203526471 // HyAB: 0.7881235684518256
+7: SRgb { r: 255, g: 153, b: 190 } // 0.6: SRgb { r: 128, g: 74, b: 94 } // Max: 0.2707955714282604 // HyAB: 0.9269740324710629
+8: SRgb { r: 23, g: 255, b: 219 } // 0.6: SRgb { r: 6, g: 128, b: 109 } // Max: 0.25220034946671915 // HyAB: 1.058825105358651
+9: SRgb { r: 255, g: 173, b: 2 } // 0.6: SRgb { r: 128, g: 85, b: 0 } // Max: 0.19864583879751815 // HyAB: 0.9771447822811652
+Enough for only 9 colors
+Total time: 66.0074793s
 */
 
 /*
