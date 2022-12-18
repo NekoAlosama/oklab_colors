@@ -39,6 +39,8 @@ fn main() {
                 .delta_hyab(starting_color.srgb_to_oklab())
                 > starting_color_mean
         });
+    
+    let mut total_delta_e = 0.0;
 
     // Find 9 new colors
     // This produces a list of 8 well-contrasting colors and one excess color
@@ -67,7 +69,7 @@ fn main() {
                     continue;
                 }
                 let hue_delta = saved_color.delta_h(sample_color) * (sample_color.chroma() /  saved_color.chroma());
-                if hue_delta < HUE_LIMIT {
+                if hue_delta < saved_color.chroma() * HUE_LIMIT {
                     return None
                 }
             }
@@ -121,15 +123,32 @@ fn main() {
                 .delta_hyab(next_color.srgb_to_oklab())
         );
         saved_srgb.push(next_color);
+        total_delta_e += max_delta_e;
     }
 
+    println!("total_delta_e: {total_delta_e:?}");
     println!(
         "Total time: {:?}",
         start_time.elapsed().expect("Time went backwards")
     );
 }
-const HUE_LIMIT: f64 = 0.0;
+const HUE_LIMIT: f64 = 0.526;
 /*
+// relative
+HUE_LIMIT: 0.526
+starting_color_mean: 0.7879053739478867
+1: SRgb { r: 255, g: 255, b: 0 } // 0.6: SRgb { r: 144, g: 146, b: 95 } // Max: 1.178988628052311 // HyAB: 1.178988628052311
+2: SRgb { r: 174, g: 0, b: 255 } // 0.6: SRgb { r: 84, g: 52, b: 110 } // Max: 0.8856062180812202 // HyAB: 0.8859335093126509
+3: SRgb { r: 255, g: 105, b: 3 } // 0.6: SRgb { r: 121, g: 77, b: 58 } // Max: 0.4916477399434682 // HyAB: 0.9014127903350057
+4: SRgb { r: 0, g: 154, b: 0 } // 0.6: SRgb { r: 48, g: 80, b: 46 } // Max: 0.41053314739230745 // HyAB: 0.7968875477963855
+5: SRgb { r: 0, g: 224, b: 228 } // 0.6: SRgb { r: 80, g: 122, b: 122 } // Max: 0.3933413117118847 // HyAB: 0.9622739500224883
+6: SRgb { r: 0, g: 77, b: 255 } // 0.6: SRgb { r: 32, g: 55, b: 104 } // Max: 0.2852811203526471 // HyAB: 0.7881235684518256
+7: SRgb { r: 214, g: 0, b: 99 } // 0.6: SRgb { r: 98, g: 47, b: 60 } // Max: 0.2814983957342849 // HyAB: 0.7895693640603396
+8: SRgb { r: 255, g: 0, b: 207 } // 0.6: SRgb { r: 120, g: 62, b: 103 } // Max: 0.2455556318824372 // HyAB: 0.9701216452318219
+Enough for only 8 colors
+Total time: 44.1949242s
+
+// not relative
 HUE_LIMIT: 0.117
 starting_color_mean: 0.7879053739478905
 1: SRgb { r: 255, g: 255, b: 0 } // 0.6: SRgb { r: 144, g: 146, b: 95 } // Max: 1.178988628052311 // HyAB: 1.178988628052311
@@ -143,6 +162,7 @@ starting_color_mean: 0.7879053739478905
 Enough for only 8 colors
 Total time: 45.5069883s
 
+// no limit
 HUE_LIMIT: 0.0
 starting_color_mean: 0.7879053739478852
 1: SRgb { r: 255, g: 255, b: 0 } // 0.6: SRgb { r: 144, g: 146, b: 95 } // Max: 1.178988628052311 // HyAB: 1.178988628052311
