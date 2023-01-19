@@ -11,7 +11,7 @@ pub struct Rgb<T> {
 
 #[derive(Copy, Clone, Debug)]
 pub struct AllSRgb {
-    color: SRgb,
+    next_color: SRgb,
     stop: bool,
 }
 
@@ -21,39 +21,33 @@ impl Iterator for AllSRgb {
     type Item = SRgb;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let current = self.color;
+        // Save our curent color to return later
+        let current_color = self.next_color;
 
         if self.stop {
-            return None;
+            return None
         }
 
-        let mut r = self.color.r;
-        let mut g = self.color.g;
-        let mut b = self.color.b;
+        // Increment b by 1, then increrment g if b exceeds 255, then increment r if g exceeds 255, and then stop == true if r exceeds 255
+        let mut r = (current_color.r, false);
+        let mut g = (current_color.g, false);
+        let b = current_color.b.overflowing_add(1);
 
-        match b.overflowing_add(1) {
-            (n, false) => b = n,
-            (n, true) => {
-                b = n;
-                match g.overflowing_add(1) {
-                    (n, false) => g = n,
-                    (n, true) => {
-                        g = n;
-                        match r.overflowing_add(1) {
-                            (n, false) => r = n,
-                            (_, true) => {
-                                r = n;
-                                self.stop = true;
-                            }
-                        }
-                    }
+        // Will be all true if current_color == SRgb { r: 255, g: 255, b: 255 }, so calling .next() after should return nothing
+        if b.1 {
+            g = current_color.g.overflowing_add(1);
+            if g.1 {
+                r = current_color.r.overflowing_add(1);
+                if r.1 {
+                    self.stop = true;
                 }
             }
         }
 
-        self.color = SRgb { r, g, b };
+        self.next_color = SRgb { r: r.0, g: g.0, b: b.0 };
 
-        Some(current)
+
+        Some(current_color)
     }
 }
 
@@ -61,7 +55,7 @@ impl Iterator for AllSRgb {
 impl Default for AllSRgb {
     fn default() -> Self {
         Self {
-            color: SRgb { r: 0, g: 0, b: 0 },
+            next_color: SRgb { r: 0, g: 0, b: 0 },
             stop: false,
         }
     }
