@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+
 use crate::oklab::*;
 
 // Implementation from the rgb crate, modified for personal use
@@ -9,61 +10,10 @@ pub struct Rgb<T> {
     pub b: T,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct AllSRgb {
-    next_color: SRgb,
-    stop: bool,
-}
-
-// Iterator that goes over the whole RGB gamut, starting at a particular value and continuing
-// (0,0,0), (0,0,1), (0,0,2)... (0,0,255), (0,1,0)... (255,255,255), None
-impl Iterator for AllSRgb {
-    type Item = SRgb;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // Save our curent color to return later
-        let current_color = self.next_color;
-
-        if self.stop {
-            return None
-        }
-
-        // Increment b by 1, then increrment g if b exceeds 255, then increment r if g exceeds 255, and then stop == true if r exceeds 255
-        let mut r = (current_color.r, false);
-        let mut g = (current_color.g, false);
-        let b = current_color.b.overflowing_add(1);
-
-        // Will be all true if current_color == SRgb { r: 255, g: 255, b: 255 }, so calling .next() after should return nothing
-        if b.1 {
-            g = current_color.g.overflowing_add(1);
-            if g.1 {
-                r = current_color.r.overflowing_add(1);
-                if r.1 {
-                    self.stop = true;
-                }
-            }
-        }
-
-        self.next_color = SRgb { r: r.0, g: g.0, b: b.0 };
-
-
-        Some(current_color)
-    }
-}
-
-// Didn't implement new() since I can't really start with SRgb { r: 0, g: 0, b: -1 }
-impl Default for AllSRgb {
-    fn default() -> Self {
-        Self {
-            next_color: SRgb { r: 0, g: 0, b: 0 },
-            stop: false,
-        }
-    }
-}
-
 pub type SRgb = Rgb<u8>;
 pub type LRgb = Rgb<f64>;
 
+use itertools::iproduct;
 impl Rgb<u8> {
     pub fn srgb_to_lrgb(self) -> LRgb {
         Rgb {
@@ -87,6 +37,10 @@ impl Rgb<u8> {
 
     pub fn max(self) -> u8 {
         self.r.max(self.g).max(self.b)
+    }
+    // itertools calls this the "cartesian product", where the series is (0,0,0),(0,0,1)...(0,0,255),(0,1,0), until (255,255,255)
+    pub fn all_colors() -> impl Iterator<Item = Rgb<u8>> + Clone {
+        iproduct!(0..=255, 0..=255, 0..=255).map(|(r, g, b)| SRgb { r, g, b })
     }
 }
 

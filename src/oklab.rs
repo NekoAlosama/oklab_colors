@@ -89,14 +89,14 @@ impl Oklab {
             .sqrt()
     }
 
-    pub fn delta_eok(self, other: Oklab) -> f64 {
+    pub fn delta_e_eok(self, other: Oklab) -> f64 {
         // Euclidian distance color difference formula
         // Value range: 0.0 - 1.0 (black vs. white)
         (self.delta_l(other).powi(2) + self.delta_a(other).powi(2) + self.delta_b(other).powi(2))
             .sqrt()
     }
 
-    pub fn delta_hyab(self, other: Oklab) -> f64 {
+    pub fn delta_e_hyab(self, other: Oklab) -> f64 {
         // Hybrid absolute and Euclidian distance formula
         // Shown to be better for large color differences compared to DE2000 for CIELAB, unknown for Oklab
         // Higher weight towards L differences
@@ -120,11 +120,11 @@ impl Oklab {
         let saved_color = Mutex::new(SRgb { r: 0, g: 0, b: 0 });
 
         // Despite parallelization, this is still rather slow
-        AllSRgb::default()
+        SRgb::all_colors()
             .par_bridge()
             .map(|thing| thing.srgb_to_oklab())
             .for_each(|sample| {
-                let delta = self.delta_hyab(sample);
+                let delta = self.delta_e_hyab(sample);
 
                 if delta < *saved_delta.lock() {
                     *saved_delta.lock() = delta;

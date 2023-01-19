@@ -17,10 +17,10 @@ fn main() {
     let mut saved_srgb: Vec<SRgb> = vec![starting_color];
 
     // Calculate HyAB mean for starting color
-    let starting_color_deltas = AllSRgb::default().par_bridge().map(|color| {
+    let starting_color_deltas = SRgb::all_colors().par_bridge().map(|color| {
         color
             .srgb_to_oklab()
-            .delta_hyab(starting_color.srgb_to_oklab())
+            .delta_e_hyab(starting_color.srgb_to_oklab())
     });
 
     // Since the range of delta_hyab should be from 0.0 -> ~1.17, there should be no outliers, though the distribution is skewed
@@ -31,15 +31,13 @@ fn main() {
     println!("starting_color_mean: {starting_color_mean:?}");
 
     // Create an iterator that pre-filters out colors based on starting_color_mean and l_mean
-    let filtered_values = AllSRgb::default()
-        .par_bridge()
-        .filter(|color| {
-            color
-                .srgb_to_oklab()
-                .delta_hyab(starting_color.srgb_to_oklab())
-                > starting_color_mean
-        });
-    
+    let filtered_values = SRgb::all_colors().par_bridge().filter(|color| {
+        color
+            .srgb_to_oklab()
+            .delta_e_hyab(starting_color.srgb_to_oklab())
+            > starting_color_mean
+    });
+
     let mut total_delta_e = 0.0;
 
     // Find 9 new colors
@@ -59,29 +57,33 @@ fn main() {
         };
         let mut max_delta_e = f64::MIN;
 
-        let hue_filtered_values: Vec<Rgb<u8>> = filtered_values.clone().filter_map(|color| {
-            let sample_color = color.srgb_to_oklab();
+        let hue_filtered_values: Vec<Rgb<u8>> = filtered_values
+            .clone()
+            .filter_map(|color| {
+                let sample_color = color.srgb_to_oklab();
 
-            for saved_color in &saved_oklab {
-                if saved_color.chroma() < f64::MIN_POSITIVE
-                    || sample_color.chroma() < f64::MIN_POSITIVE
-                {
-                    continue;
+                for saved_color in &saved_oklab {
+                    if saved_color.chroma() < f64::MIN_POSITIVE
+                        || sample_color.chroma() < f64::MIN_POSITIVE
+                    {
+                        continue;
+                    }
+                    let hue_delta = saved_color.delta_h(sample_color)
+                        * (sample_color.chroma() / saved_color.chroma());
+                    if hue_delta < saved_color.chroma() * HUE_LIMIT {
+                        return None;
+                    }
                 }
-                let hue_delta = saved_color.delta_h(sample_color) * (sample_color.chroma() /  saved_color.chroma());
-                if hue_delta < saved_color.chroma() * HUE_LIMIT {
-                    return None
-                }
-            }
-            Some(color)
-        }).collect();
-        
+                Some(color)
+            })
+            .collect();
+
         for color in &hue_filtered_values {
             let sample_color = color.srgb_to_oklab();
 
             let minimum = saved_oklab
                 .iter()
-                .map(|color| color.delta_hyab(sample_color))
+                .map(|color| color.delta_e_hyab(sample_color))
                 .fold(f64::INFINITY, |a, b| a.min(b));
 
             // If the minimum is greater than max_delta_e, save it
@@ -121,7 +123,7 @@ fn main() {
             max_delta_e,
             starting_color
                 .srgb_to_oklab()
-                .delta_hyab(next_color.srgb_to_oklab())
+                .delta_e_hyab(next_color.srgb_to_oklab())
         );
         saved_srgb.push(next_color);
         total_delta_e += max_delta_e;
@@ -133,11 +135,11 @@ fn main() {
         start_time.elapsed().expect("Time went backwards")
     );
 }
-const HUE_LIMIT: f64 = 0.0;
+const HUE_LIMIT: f64 = 0.526;
 /*
 // relative
 HUE_LIMIT: 0.526
-starting_color_mean: 0.7879053739478803
+starting_color_mean: 0.7879053739478896
 1: SRgb { r: 255, g: 255, b: 0 } // 0.6: SRgb { r: 144, g: 146, b: 95 } // Max: 1.178988628052311 // HyAB: 1.178988628052311
 2: SRgb { r: 174, g: 0, b: 255 } // 0.6: SRgb { r: 84, g: 52, b: 110 } // Max: 0.8856062180812202 // HyAB: 0.8859335093126509
 3: SRgb { r: 255, g: 105, b: 3 } // 0.6: SRgb { r: 121, g: 77, b: 58 } // Max: 0.4916477399434682 // HyAB: 0.9014127903350057
@@ -148,7 +150,7 @@ starting_color_mean: 0.7879053739478803
 8: SRgb { r: 255, g: 0, b: 207 } // 0.6: SRgb { r: 120, g: 62, b: 103 } // Max: 0.2455556318824372 // HyAB: 0.9701216452318219
 Enough for only 8 colors
 total_delta_e: 4.17245219315056
-Total time: 45.7564243s
+Total time: 49.5832683s
 
 // not relative
 HUE_LIMIT: 0.117
