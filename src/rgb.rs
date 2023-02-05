@@ -14,7 +14,7 @@ pub type SRgb = Rgb<u8>;
 pub type LRgb = Rgb<f64>;
 
 use itertools::iproduct;
-impl Rgb<u8> {
+impl SRgb {
     pub fn srgb_to_lrgb(self) -> LRgb {
         Rgb {
             r: to_linear(self.r as f64 / 255.0),
@@ -44,7 +44,7 @@ impl Rgb<u8> {
     }
 }
 
-impl Rgb<f64> {
+impl LRgb {
     // Note: This is not a good way to clamp sRGB colors
     // The .clamp() is only to prevent over/underflows from rounding errors
     pub fn lrgb_to_srgb(self) -> SRgb {

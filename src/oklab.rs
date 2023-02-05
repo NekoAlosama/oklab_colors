@@ -100,14 +100,12 @@ impl Oklab {
         // Hybrid absolute and Euclidian distance formula
         // Shown to be better for large color differences compared to DE2000 for CIELAB, unknown for Oklab
         // Higher weight towards L differences
-        // Value range: 0.0 - 1.178988628052311 (black vs. yellow; black vs. white gives 1.0)
+        // Value range: 0.0 - 1.178988628052311 (black vs. yellow gives upper bound; black vs. white gives 1.0)
         self.delta_l(other).abs() + self.delta_a(other).hypot(self.delta_b(other))
     }
 
     pub fn oklab_to_srgb_closest(self) -> SRgb {
         // Finds the SRgb value that is closest to the given Oklab
-        // Using delta_hyab() produces similar results with clamp_c().oklab_to_srgb()
-        // Using delta_eok() produces similar results with plain oklab_to_srgb()
 
         // Early exit; should work
         if self.oklab_to_lrgb().min() > -f64::EPSILON
@@ -126,129 +124,16 @@ impl Oklab {
             .for_each(|sample| {
                 let delta = self.delta_e_hyab(sample);
 
-                if delta < *saved_delta.lock() {
-                    *saved_delta.lock() = delta;
-                    *saved_color.lock() = sample.oklab_to_srgb();
+                let mut locked_saved_delta = saved_delta.lock();
+                let mut locked_saved_color = saved_color.lock();
+
+                if delta < *locked_saved_delta {
+                    *locked_saved_delta = delta;
+                    *locked_saved_color = sample.oklab_to_srgb();
                 }
             });
 
         saved_color.into_inner()
-    }
-
-    pub fn clamp_l(self) -> Oklab {
-        // Multiplier range of 0.0 to 1.0
-        let mut multiplier = 0.5;
-
-        for exp in 2..52 {
-            let test_color = Oklab {
-                l: self.l * multiplier,
-                ..self
-            }
-            .oklab_to_lrgb();
-
-            let min_channel = test_color.min();
-            let max_channel = test_color.max();
-
-            // Adjust multiplier such that it produces a color within the gamut by 0.25 units
-            if min_channel < -0.25 / 255.0 || max_channel > 1.0 + 0.25 / 255.0 {
-                multiplier -= 2.0_f64.powi(-exp);
-            } else {
-                multiplier += 2.0_f64.powi(-exp);
-            }
-        }
-
-        Oklab {
-            l: self.l * multiplier,
-            ..self
-        }
-    }
-
-    pub fn maximize_l(self) -> Oklab {
-        let mut multiplier = 1.0 + 2.0_f64.powi(52);
-
-        for exp in -51..52 {
-            let test_color = Oklab {
-                l: self.l * multiplier,
-                ..self
-            }
-            .oklab_to_lrgb();
-
-            let min_channel = test_color.min();
-            let max_channel = test_color.max();
-
-            // Adjust multiplier such that it produces a color within the gamut by 0.25 units
-            if min_channel < -0.25 / 255.0 || max_channel > 1.0 + 0.25 / 255.0 {
-                multiplier -= 2.0_f64.powi(-exp);
-            } else {
-                multiplier += 2.0_f64.powi(-exp);
-            }
-        }
-
-        Oklab {
-            l: self.l * multiplier,
-            ..self
-        }
-    }
-
-    pub fn clamp_c(self) -> Oklab {
-        let color = self.oklab_to_oklch();
-        // Multiplier range of 0.0 to 1.0
-        let mut multiplier = 0.5;
-
-        for exp in 2..52 {
-            let test_color = Oklch {
-                c: color.c * multiplier,
-                ..color
-            }
-            .oklch_to_oklab()
-            .oklab_to_lrgb();
-
-            let min_channel = test_color.min();
-            let max_channel = test_color.max();
-
-            // Adjust multiplier such that it produces a color within the gamut by 0.25 units
-            if min_channel < -0.25 / 255.0 || max_channel > 1.0 + 0.25 / 255.0 {
-                multiplier -= 2.0_f64.powi(-exp);
-            } else {
-                multiplier += 2.0_f64.powi(-exp);
-            }
-        }
-
-        Oklch {
-            c: color.c * multiplier,
-            ..color
-        }
-        .oklch_to_oklab()
-    }
-
-    pub fn maximize_c(self) -> Oklab {
-        let color = self.oklab_to_oklch();
-        let mut multiplier = 1.0 + 2.0_f64.powi(52);
-
-        for exp in -51..52 {
-            let test_color = Oklch {
-                c: color.c * multiplier,
-                ..color
-            }
-            .oklch_to_oklab()
-            .oklab_to_lrgb();
-
-            let min_channel = test_color.min();
-            let max_channel = test_color.max();
-
-            // Adjust multiplier such that it produces a color within the gamut by 0.25 units
-            if min_channel < -0.25 / 255.0 || max_channel > 1.0 + 0.25 / 255.0 {
-                multiplier -= 2.0_f64.powi(-exp);
-            } else {
-                multiplier += 2.0_f64.powi(-exp);
-            }
-        }
-
-        Oklch {
-            c: color.c * multiplier,
-            ..color
-        }
-        .oklch_to_oklab()
     }
 }
 
