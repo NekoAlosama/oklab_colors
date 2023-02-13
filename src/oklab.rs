@@ -15,6 +15,12 @@ const K_2: f64 = 0.03;
 const K_3: f64 = (1.0 + K_1) / (1.0 + K_2);
 
 impl Oklab {
+    pub const BLACK: Oklab = Oklab {
+        l: 0.0,
+        a: 0.0,
+        b: 0.0,
+    };
+
     pub fn oklab_to_lrgb(self) -> LRgb {
         let l_ = self.l + 0.3963377774 * self.a + 0.2158037573 * self.b;
         let m_ = self.l - 0.1055613458 * self.a - 0.0638541728 * self.b;
@@ -49,6 +55,11 @@ impl Oklab {
             l: (self.l * (self.l + K_1)) / (K_3 * (self.l + K_2)),
             ..self
         }
+    }
+
+    pub fn mix(self, other: Oklab) -> Oklab {
+        // Linear mixing
+        (self + other) / 2.0
     }
 
     pub fn chroma(self) -> f64 {
@@ -245,5 +256,112 @@ impl Oklch {
 
     pub fn oklch_to_srgb(self) -> SRgb {
         self.oklch_to_oklab().oklab_to_srgb()
+    }
+
+    pub fn oklch_to_srgb_closest(self) -> SRgb {
+        self.oklch_to_oklab().oklab_to_srgb_closest()
+    }
+
+    pub fn mix(self, other: Oklch) -> Oklch {
+        // Linear mixing
+        // Properly mixes hue
+        Oklch {
+            l: (self.l + other.l) / 2.0,
+            c: (self.c + other.c) / 2.0,
+            // Mixes according to the shortest path
+            h: match (self.h - other.h).abs() < std::f64::consts::PI {
+                true => (self.h + other.h) / 2.0,
+                false => (self.h + other.h) / 2.0 + std::f64::consts::PI,
+            },
+        }
+    }
+}
+
+impl Add<Oklch> for Oklch {
+    type Output = Oklch;
+
+    fn add(self, other: Oklch) -> Oklch {
+        Oklch {
+            l: self.l + other.l,
+            c: self.c + other.c,
+            h: self.h + other.h,
+        }
+    }
+}
+impl Add<f64> for Oklch {
+    type Output = Oklch;
+
+    fn add(self, other: f64) -> Oklch {
+        Oklch {
+            l: self.l + other,
+            c: self.c + other,
+            h: self.h + other,
+        }
+    }
+}
+impl Sub<Oklch> for Oklch {
+    type Output = Oklch;
+
+    fn sub(self, other: Oklch) -> Oklch {
+        Oklch {
+            l: self.l - other.l,
+            c: self.c - other.c,
+            h: self.h - other.h,
+        }
+    }
+}
+impl Sub<f64> for Oklch {
+    type Output = Oklch;
+
+    fn sub(self, other: f64) -> Oklch {
+        Oklch {
+            l: self.l - other,
+            c: self.c - other,
+            h: self.h - other,
+        }
+    }
+}
+impl Mul<Oklch> for Oklch {
+    type Output = Oklch;
+
+    fn mul(self, other: Oklch) -> Oklch {
+        Oklch {
+            l: self.l * other.l,
+            c: self.c * other.c,
+            h: self.h * other.h,
+        }
+    }
+}
+impl Mul<f64> for Oklch {
+    type Output = Oklch;
+
+    fn mul(self, other: f64) -> Oklch {
+        Oklch {
+            l: self.l * other,
+            c: self.c * other,
+            h: self.h * other,
+        }
+    }
+}
+impl Div<Oklch> for Oklch {
+    type Output = Oklch;
+
+    fn div(self, other: Oklch) -> Oklch {
+        Oklch {
+            l: self.l / other.l,
+            c: self.c / other.c,
+            h: self.h / other.h,
+        }
+    }
+}
+impl Div<f64> for Oklch {
+    type Output = Oklch;
+
+    fn div(self, other: f64) -> Oklch {
+        Oklch {
+            l: self.l / other,
+            c: self.c / other,
+            h: self.h / other,
+        }
     }
 }

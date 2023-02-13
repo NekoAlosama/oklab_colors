@@ -24,7 +24,7 @@ fn main() {
                 .delta_e_hyab(sample_color.srgb_to_oklab())
         })
         .map(|delta| delta.powf(1.0 / 2.0_f64.powi(24)))
-        .filter(|delta_pow| *delta_pow > 0.0)
+        .filter(|delta_pow| *delta_pow > 0.0) // Ignore zeroes, can't find a better way to implement it
         .product::<f64>();
 
     println!("color_center: {color_center:?}");
@@ -55,15 +55,14 @@ fn main() {
                     .permutations(2)
                     .map(|vector| vector[0].delta_e_hyab(vector[1]));
 
-                //let delta = all_deltas.fold(f64::MAX, |a, b| if a < b { a } else { b });
                 let all_deltas_count = all_deltas.clone().count() as f64;
                 let delta = all_deltas
                     .map(|delta| delta.powf(all_deltas_count.recip()))
                     .product();
 
-                // Aquire locks so that there is a lower possibilty of results that are off by 1
+                // Acquire locks so that there is a lower possibilty of results that are off by 1
                 // I think this is how it works?
-                // Ex: returning (0,1,255) or (0,0,254) instead of (0,0,255)
+                // Ex: returning (0,0,254) instead of (0,0,255)
                 let mut locked_saved_delta = saved_delta.lock();
                 let mut locked_saved_color = saved_color.lock();
 
@@ -86,7 +85,7 @@ fn main() {
             std::process::exit(99);
         } else {
             println!(
-                "{saved_color:?}, {:?}, {saved_delta:?}",
+                "{saved_color}, {}, {saved_delta:?}",
                 Oklab {
                     l: saved_color.srgb_to_oklab().l * 2.0 / 3.0,
                     a: saved_color.srgb_to_oklab().a / 3.0,
@@ -105,15 +104,27 @@ fn main() {
 }
 
 /*
-Product / Geometric mean
-color_center: 0.7638691045633555
-Rgb { r: 255, g: 255, b: 0 }, Rgb { r: 144, g: 146, b: 95 }, Mutex { data: 1.1789886280523112 }
-Rgb { r: 232, g: 0, b: 255 }, Rgb { r: 111, g: 62, b: 117 }, Mutex { data: 0.9769937143974741 }
-Rgb { r: 0, g: 0, b: 255 }, Rgb { r: 18, g: 41, b: 98 }, Mutex { data: 0.8531304239398674 }
-Rgb { r: 0, g: 255, b: 0 }, Rgb { r: 86, g: 136, b: 82 }, Mutex { data: 0.7866553123091546 }
-Rgb { r: 220, g: 0, b: 0 }, Rgb { r: 99, g: 47, b: 40 }, Mutex { data: 0.7307681535561 }
-Rgb { r: 255, g: 255, b: 255 }, Rgb { r: 148, g: 148, b: 148 }, Mutex { data: 0.6847196266388391 }
-Rgb { r: 111, g: 0, b: 255 }, Rgb { r: 56, g: 45, b: 103 }, Mutex { data: 0.6495625967729834 }
-Rgb { r: 0, g: 195, b: 0 }, Rgb { r: 64, g: 103, b: 60 }, Mutex { data: 0.6230359587380241 }
-Total time: 321.7228071s
+delta_e_hyab
+color_center: 0.7638691045635004
+(255, 255, 0), (144, 146, 95), Mutex { data: 1.1789886280523112 }
+(232, 0, 255), (111, 62, 117), Mutex { data: 0.9769937143974741 }
+(0, 0, 255), (18, 41, 98), Mutex { data: 0.8531304239398674 }
+(0, 255, 0), (86, 136, 82), Mutex { data: 0.7866553123091546 }
+(220, 0, 0), (99, 47, 40), Mutex { data: 0.7307681535561 }
+(255, 255, 255), (148, 148, 148), Mutex { data: 0.6847196266388391 }
+(111, 0, 255), (56, 45, 103), Mutex { data: 0.6495625967729834 }
+(0, 195, 0), (64, 103, 60), Mutex { data: 0.6230359587380241 }
+Total time: 299.8869481s
+
+delta_e_eok
+color_center: 0.6363311198384808
+(255, 255, 255), (148, 148, 148), Mutex { data: 0.9999999934735468 }
+(255, 0, 255), (122, 66, 120), Mutex { data: 0.6974433524326189 }
+(0, 255, 0), (86, 136, 82), Mutex { data: 0.6326735344919341 }
+(0, 119, 255), (45, 71, 110), Mutex { data: 0.564564503672074 }
+(255, 0, 0), (116, 57, 48), Mutex { data: 0.5288553467330599 }
+(0, 157, 0), (49, 82, 47), Mutex { data: 0.49706666363890095 }
+(255, 255, 0), (144, 146, 95), Mutex { data: 0.47629312002773977 }
+(156, 0, 255), (76, 50, 108), Mutex { data: 0.46515053689536395 }
+Total time: 275.4107714s
 */

@@ -13,6 +13,13 @@ pub struct Rgb<T> {
 pub type SRgb = Rgb<u8>;
 pub type LRgb = Rgb<f64>;
 
+use std::fmt;
+impl fmt::Display for SRgb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {}, {})", self.r, self.g, self.b)
+    }
+}
+
 use itertools::iproduct;
 impl SRgb {
     pub fn srgb_to_lrgb(self) -> LRgb {
