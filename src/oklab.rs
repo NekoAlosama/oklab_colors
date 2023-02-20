@@ -40,7 +40,7 @@ impl Oklab {
         // You might want to use the other oklab_to_srgb_* functions
         self.oklab_to_lrgb().lrgb_to_srgb()
     }
-
+    
     pub fn ref_l(self) -> Oklab {
         Oklab {
             l: (K_3 * self.l - K_1

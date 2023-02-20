@@ -57,7 +57,9 @@ fn main() {
                 let test_color = test_srgb.srgb_to_oklab().ref_l();
                 let hue_differences = starting_colors
                     .clone()
-                    .filter(|color| color.chroma() > 0.01)
+                    // Check if the chorma of the starting color is greater than 0.0
+                    // In .delta_h_relative(), not checking would result in a divide-by-zero
+                    .filter(|color| (color.a.powi(2) + color.b.powi(2)) > 0.0)
                     .map(|color| color.delta_h_relative(test_color));
 
                 let minimum = hue_differences.fold(f64::MAX, |a, b| if a < b { a } else { b });
@@ -155,7 +157,7 @@ color_center: 0.6961545907868586
 Total time: 326.7186512s
 
 delta_e_hyab with ref_l and hue filter (1.0 / 3.0)
-color_center: 0.6961545907868133
+color_center: 0.6961545907868837
 (255, 255, 0), (158, 160, 109), Mutex { data: 1.1737103045344182 }
 (255, 0, 255), (136, 79, 133), Mutex { data: 0.9770036181683445 }
 (3, 53, 255), (36, 60, 113), Mutex { data: 0.8539989061926019 }
@@ -164,7 +166,7 @@ color_center: 0.6961545907868133
 (0, 255, 255), (105, 153, 153), Mutex { data: 0.687495415107223 }
 (131, 0, 255), (76, 59, 118), Mutex { data: 0.6563199610411524 }
 (255, 154, 0), (141, 110, 80), Mutex { data: 0.6251395055898334 }
-Total time: 93.9469995s
+Total time: 75.3583256s
 
 delta_e_eok
 color_center: 0.6363311198384808
