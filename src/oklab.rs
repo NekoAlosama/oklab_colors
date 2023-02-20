@@ -100,6 +100,12 @@ impl Oklab {
             .sqrt()
     }
 
+    pub fn delta_h_relative(self, other: Oklab) -> f64 {
+        // Multiplies delta_h() by a relative multiplier
+        // self is the reference color, and other is the sample color
+        self.delta_h(other) * (other.chroma() / (self.a.powi(2) + self.b.powi(2)))
+    }
+
     pub fn delta_e_eok(self, other: Oklab) -> f64 {
         // Euclidian distance color difference formula
         // Value range: 0.0 - 1.0 (black vs. white)

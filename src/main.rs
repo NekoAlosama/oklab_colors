@@ -25,7 +25,7 @@ fn main() {
                 .delta_e_hyab(sample_color.srgb_to_oklab().ref_l())
         })
         .map(|delta| delta.powf(1.0 / 2.0_f64.powi(24)))
-         // Ignore zeroes for the geometric mean, can't find a better way to implement it
+        // Ignore zeroes for the geometric mean, can't find a better way to implement it
         .filter(|delta_pow| *delta_pow > 0.0)
         .product::<f64>();
 
@@ -38,7 +38,9 @@ fn main() {
             g: 99,
             b: 99,
         });
-        let starting_colors = saved_colors.iter().map(|color| color.srgb_to_oklab().ref_l());
+        let starting_colors = saved_colors
+            .iter()
+            .map(|color| color.srgb_to_oklab().ref_l());
 
         SRgb::all_colors()
             .par_bridge()
@@ -50,11 +52,27 @@ fn main() {
                     .delta_e_hyab(saved_colors[0].srgb_to_oklab().ref_l())
                     > color_center
             })
+            // Hue filter, don't know if this is best
+            .filter(|test_srgb| {
+                let test_color = test_srgb.srgb_to_oklab().ref_l();
+                let hue_differences = starting_colors
+                    .clone()
+                    .filter(|color| color.chroma() > 0.01)
+                    .map(|color| color.delta_h_relative(test_color));
+
+                let minimum = hue_differences.fold(f64::MAX, |a, b| if a < b { a } else { b });
+
+                if minimum < (1.0 / 3.0_f64) {
+                    false
+                } else {
+                    true
+                }
+            })
             .for_each(|test_srgb| {
                 let test_colors = starting_colors
                     .clone()
                     .chain(std::iter::once(test_srgb.srgb_to_oklab().ref_l()));
-                
+
                 // Calculate the delta_e_hyab of all pairs of colors
                 let all_deltas = test_colors
                     .permutations(2)
@@ -135,6 +153,18 @@ color_center: 0.6961545907868586
 (129, 0, 255), (75, 58, 118), Mutex { data: 0.6635703097445015 }
 (0, 175, 0), (68, 104, 65), Mutex { data: 0.6379754887424087 }
 Total time: 326.7186512s
+
+delta_e_hyab with ref_l and hue filter (1.0 / 3.0)
+color_center: 0.6961545907868133
+(255, 255, 0), (158, 160, 109), Mutex { data: 1.1737103045344182 }
+(255, 0, 255), (136, 79, 133), Mutex { data: 0.9770036181683445 }
+(3, 53, 255), (36, 60, 113), Mutex { data: 0.8539989061926019 }
+(0, 255, 0), (99, 150, 95), Mutex { data: 0.7905701301505752 }
+(232, 0, 0), (119, 62, 54), Mutex { data: 0.73696951351631 }
+(0, 255, 255), (105, 153, 153), Mutex { data: 0.687495415107223 }
+(131, 0, 255), (76, 59, 118), Mutex { data: 0.6563199610411524 }
+(255, 154, 0), (141, 110, 80), Mutex { data: 0.6251395055898334 }
+Total time: 93.9469995s
 
 delta_e_eok
 color_center: 0.6363311198384808
