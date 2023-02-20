@@ -12,20 +12,21 @@ fn main() {
     let start_time = std::time::SystemTime::now();
 
     // Save generated colors into this Vec for future colors
-    let mut colors = vec![SRgb { r: 0, g: 0, b: 0 }];
+    let mut saved_colors = vec![SRgb { r: 0, g: 0, b: 0 }];
 
-    // Find the geometric mean of the D_E_HyAB of all colors in the SRgb color space (should be ~0.7638691045633106 for black)
-    // Arithmetic mean (~0.7879053739478903) was seen to be too restrictive, and geometric mean kinda makes sense?
+    // Find the geometric mean of the delta_e_hyab of all SRgb colors (should be ~0.6961545907868586 for black)
+    // Geometric mean is used here and later
     let color_center = SRgb::all_colors()
         .par_bridge()
         .map(|sample_color| {
-            colors[0]
+            saved_colors[0]
                 .srgb_to_oklab()
                 .ref_l()
                 .delta_e_hyab(sample_color.srgb_to_oklab().ref_l())
         })
         .map(|delta| delta.powf(1.0 / 2.0_f64.powi(24)))
-        .filter(|delta_pow| *delta_pow > 0.0) // Ignore zeroes, can't find a better way to implement it
+         // Ignore zeroes for the geometric mean, can't find a better way to implement it
+        .filter(|delta_pow| *delta_pow > 0.0)
         .product::<f64>();
 
     println!("color_center: {color_center:?}");
@@ -37,34 +38,38 @@ fn main() {
             g: 99,
             b: 99,
         });
-        let starting_colors = colors.iter().map(|color| color.srgb_to_oklab().ref_l());
+        let starting_colors = saved_colors.iter().map(|color| color.srgb_to_oklab().ref_l());
 
         SRgb::all_colors()
             .par_bridge()
+            // Use color_center to remove colors below the mean
             .filter(|test_srgb| {
                 test_srgb
                     .srgb_to_oklab()
                     .ref_l()
-                    .delta_e_hyab(colors[0].srgb_to_oklab().ref_l())
+                    .delta_e_hyab(saved_colors[0].srgb_to_oklab().ref_l())
                     > color_center
             })
             .for_each(|test_srgb| {
                 let test_colors = starting_colors
                     .clone()
                     .chain(std::iter::once(test_srgb.srgb_to_oklab().ref_l()));
-
+                
+                // Calculate the delta_e_hyab of all pairs of colors
                 let all_deltas = test_colors
                     .permutations(2)
                     .map(|vector| vector[0].delta_e_hyab(vector[1]));
 
+                // Calculate the geometric mean of the all_deltas
+                // Allows for 0.0, since that means that test_srgb is the same as one of the colors in saved_colors
                 let all_deltas_count = all_deltas.clone().count() as f64;
                 let delta = all_deltas
                     .map(|delta| delta.powf(all_deltas_count.recip()))
                     .product();
 
                 // Acquire locks so that there is a lower possibilty of results that are off by 1
+                // Ex: returning (0, 0, 254) instead of (0, 0, 255)
                 // I think this is how it works?
-                // Ex: returning (0,0,254) instead of (0,0,255)
                 let mut locked_saved_delta = saved_delta.lock();
                 let mut locked_saved_color = saved_color.lock();
 
@@ -83,7 +88,7 @@ fn main() {
                 b: 99,
             })
         {
-            println!("Finished with {:?}", colors.len());
+            println!("Finished with {:?}", saved_colors.len());
             std::process::exit(99);
         } else {
             println!(
@@ -96,7 +101,7 @@ fn main() {
                 .unref_l()
                 .oklab_to_srgb_closest()
             );
-            colors.push(saved_color)
+            saved_colors.push(saved_color)
         }
     }
 
