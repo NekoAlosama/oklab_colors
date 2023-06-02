@@ -40,7 +40,7 @@ impl Oklab {
         // You might want to use the other oklab_to_srgb_* functions
         self.oklab_to_lrgb().lrgb_to_srgb()
     }
-    
+
     pub fn ref_l(self) -> Oklab {
         Oklab {
             l: (K_3 * self.l - K_1
@@ -106,28 +106,18 @@ impl Oklab {
         self.delta_h(other) * (other.chroma() / (self.a.powi(2) + self.b.powi(2)))
     }
 
-    pub fn delta_e_eok(self, other: Oklab) -> f64 {
+    pub fn delta_e(self, other: Oklab) -> f64 {
         // Euclidian distance color difference formula
         // Value range: 0.0 - 1.0 (black vs. white)
         (self.delta_l(other).powi(2) + self.delta_a(other).powi(2) + self.delta_b(other).powi(2))
             .sqrt()
     }
 
-    pub fn delta_e_hyab(self, other: Oklab) -> f64 {
-        // Hybrid absolute and Euclidian distance formula
-        // Shown to be better for large color differences compared to DE2000 for CIELAB, unknown for Oklab
-        // Higher weight towards L differences
-        // Value range: 0.0 - 1.178988628052311 (black vs. yellow gives upper bound; black vs. white gives 1.0)
-        self.delta_l(other).abs() + self.delta_a(other).hypot(self.delta_b(other))
-    }
-
     pub fn oklab_to_srgb_closest(self) -> SRgb {
         // Finds the SRgb value that is closest to the given Oklab
 
         // Early exit; should work
-        if self.oklab_to_lrgb().min() > -f64::EPSILON
-            && self.oklab_to_lrgb().max() < 1.0 + f64::EPSILON
-        {
+        if self.oklab_to_lrgb().min() > -1e-10 && self.oklab_to_lrgb().max() < 1.0 + f64::EPSILON {
             return self.oklab_to_srgb();
         }
 
@@ -139,7 +129,7 @@ impl Oklab {
             .par_bridge()
             .map(|thing| thing.srgb_to_oklab())
             .for_each(|sample| {
-                let delta = self.delta_e_hyab(sample);
+                let delta = self.delta_e(sample);
 
                 let mut locked_saved_delta = saved_delta.lock();
                 let mut locked_saved_color = saved_color.lock();
