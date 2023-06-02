@@ -12,7 +12,7 @@ fn main() {
 
     let mut saved_colors = vec![SRgb { r: 0, g: 0, b: 0 }];
 
-    let color_center = SRgb::all_colors()
+    let color_center = (SRgb::all_colors()
         .par_bridge()
         .filter(|sample_color| *sample_color != saved_colors[0])
         .map(|sample_color| {
@@ -20,11 +20,12 @@ fn main() {
                 .srgb_to_oklab()
                 .delta_e(sample_color.srgb_to_oklab())
         })
-        .map(|delta| delta.ln_1p() / (2.0_f64.powi(24) - 1.0))
+        .map(|delta| delta.ln_1p())
         .sum::<f64>()
+        / (2.0_f64.powi(24) - 1.0))
         .exp_m1();
 
-    println!("color_center: {color_center:?}");
+    println!("color_center: {color_center:.5}");
 
     for _ in 1..=8 {
         let saved_delta = Mutex::new(f64::MIN);
@@ -71,9 +72,7 @@ fn main() {
                     .map(|vector| vector[0].delta_e(vector[1]));
 
                 let all_deltas_count = all_deltas.clone().count() as f64;
-                let delta = all_deltas
-                    .map(|delta| delta.ln_1p() / all_deltas_count)
-                    .sum::<f64>()
+                let delta = (all_deltas.map(|delta| delta.ln_1p()).sum::<f64>() / all_deltas_count)
                     .exp_m1();
 
                 let mut locked_saved_delta = saved_delta.lock();
@@ -98,13 +97,14 @@ fn main() {
             std::process::exit(99);
         } else {
             println!(
-                "{saved_color}, {}, {saved_delta:?}",
+                "{saved_color}, {}, {b:.5}",
                 Oklab {
                     l: (saved_color.srgb_to_oklab().l * 2.0 / 3.0),
                     a: saved_color.srgb_to_oklab().a / 3.0,
                     b: saved_color.srgb_to_oklab().b / 3.0
                 }
-                .oklab_to_srgb_closest()
+                .oklab_to_srgb_closest(),
+                b = saved_delta.into_inner()
             );
             saved_colors.push(saved_color)
         }
@@ -119,14 +119,14 @@ fn main() {
 /*
 delta_e_eok
 geometric mean and no hue filter
-color_center: 0.6509722154402167
-(255, 255, 255), (148, 148, 148), Mutex { data: 0.9999999934735468 }
-(255, 0, 255), (122, 66, 120), Mutex { data: 0.721482109452596 }
-(0, 255, 0), (86, 136, 82), Mutex { data: 0.6634511588629473 }
-(168, 0, 255), (81, 51, 109), Mutex { data: 0.5893078806706322 }
-(255, 255, 0), (144, 146, 95), Mutex { data: 0.5563785397012793 }
-(242, 0, 0), (110, 53, 45), Mutex { data: 0.5285115491301053 }
-(0, 162, 0), (51, 84, 49), Mutex { data: 0.5071980000955454 }
-(0, 129, 255), (48, 76, 112), Mutex { data: 0.48903523387732406 }
-Total time: 273.5526364s
+color_center: 0.65097
+(255, 255, 255), (148, 148, 148), 1.00000
+(255, 0, 255), (122, 66, 120), 0.72148
+(0, 255, 0), (86, 136, 82), 0.66345
+(168, 0, 255), (81, 51, 109), 0.58931
+(255, 255, 0), (144, 146, 95), 0.55638
+(242, 0, 0), (110, 53, 45), 0.52851
+(0, 162, 0), (51, 84, 49), 0.50720
+(0, 129, 255), (48, 76, 112), 0.48904
+Total time: 241.7516222s
 */
