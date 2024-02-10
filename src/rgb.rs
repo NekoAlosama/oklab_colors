@@ -88,7 +88,7 @@ impl lRGB {
 
 fn to_linear(u: f64) -> f64 {
     if u >= 0.04045 {
-        (u.mul_add(200.0, 11.0)).powf(2.4)
+        (u.mul_add(200.0, 11.0) / 211.0).powf(2.4)
     } else {
         u / 12.92
     }

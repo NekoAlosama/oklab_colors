@@ -18,6 +18,17 @@ pub struct Oklch {
     pub d65_reference_l: bool,
 }
 
+impl std::fmt::Display for Oklab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {})", self.l, self.a, self.b)
+    }
+}
+impl std::fmt::Display for Oklch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {})", self.l, self.c, self.h)
+    }
+}
+
 impl Default for Oklab {
     fn default() -> Self {
         Oklab {
