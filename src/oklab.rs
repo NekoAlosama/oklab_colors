@@ -140,7 +140,7 @@ impl Oklab {
         // Finds the sRGB value that is closest to the given Oklab
 
         // Early exit; should work
-        if self.to_lrgb().min() > 0.0_f64.next_down() && self.to_lrgb().max() < 1.0_f64.next_up() {
+        if (self.to_lrgb().min() >= 0.0_f64) && self.to_lrgb().max() <= 1.0_f64 {
             return self.to_srgb();
         }
 
@@ -167,13 +167,13 @@ impl Oklab {
         saved_color.into_inner()
     }
 
-    pub fn to_srgb_opposite(self) -> rgb::sRGB {
-        // Finds the SRgb value that is very far away to the given Oklab
+    pub fn to_srgb_contrast(self) -> rgb::sRGB {
+        // Finds the sRGB value that is very far away to the given Oklab
 
         let saved_delta = Mutex::new(f64::MIN);
         let saved_color = Mutex::new(rgb::sRGB { r: 0, g: 0, b: 0 });
 
-        // All opposite colors are known to be the 1-bit values
+        // All of these colors are known to be the 1-bit values
         itertools::iproduct!([0, 255], [0, 255], [0, 255])
             .map(|(r, g, b)| rgb::sRGB { r, g, b })
             .par_bridge()

@@ -1,5 +1,3 @@
-#![feature(float_next_up_down)]
-
 mod oklab;
 mod rgb;
 
@@ -33,7 +31,7 @@ fn main() {
                     a: 0.0,
                     b: 0.0,
                     ..Default::default()
-                }) > 0.5
+                }) > 0.5_f64
             })
             .for_each(|test_srgb| {
                 let test_colors = starting_colors
@@ -128,5 +126,5 @@ haven't read the code after refactor to see what the following is supposed to be
 (255, 255, 0), (144, 146, 95), 0.03772
 (0, 135, 0), (41, 69, 39), 0.02673
 (137, 0, 255), (67, 48, 106), 0.01968
-Total time: 52.386s
+Total time: 60.789s
 */
