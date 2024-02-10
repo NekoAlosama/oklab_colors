@@ -1,78 +1,79 @@
-#![allow(dead_code)]
-
-use crate::oklab::*;
-
 // Implementation from the rgb crate, modified for personal use
+#![allow(non_camel_case_types)]
+
+use itertools;
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Rgb<T> {
-    pub r: T,
-    pub g: T,
-    pub b: T,
+pub struct sRGB {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
 }
 
-pub type SRgb = Rgb<u8>;
-pub type LRgb = Rgb<f64>;
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct lRGB {
+    pub r: f64,
+    pub g: f64,
+    pub b: f64,
+}
 
-use std::fmt;
-impl fmt::Display for SRgb {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for sRGB {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {})", self.r, self.g, self.b)
+    }
+}
+impl std::fmt::Display for lRGB {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {}, {})", self.r, self.g, self.b)
     }
 }
 
-use itertools::iproduct;
-impl SRgb {
-    pub fn srgb_to_lrgb(self) -> LRgb {
-        Rgb {
+impl Default for sRGB {
+    fn default() -> sRGB {
+        sRGB { r: 0, g: 0, b: 0 }
+    }
+}
+
+impl Default for lRGB {
+    fn default() -> lRGB {
+        lRGB {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+        }
+    }
+}
+
+impl sRGB {
+    pub fn to_lrgb(self) -> lRGB {
+        lRGB {
             r: to_linear(self.r as f64 / 255.0),
             g: to_linear(self.g as f64 / 255.0),
             b: to_linear(self.b as f64 / 255.0),
         }
     }
 
-    pub fn srgb_to_oklab(self) -> Oklab {
-        self.srgb_to_lrgb().lrgb_to_oklab()
-    }
-
-    pub fn srgb_to_oklch(self) -> Oklch {
-        self.srgb_to_lrgb().lrgb_to_oklab().oklab_to_oklch()
-    }
-
     pub fn min(self) -> u8 {
         self.r.min(self.g).min(self.b)
     }
-
     pub fn max(self) -> u8 {
         self.r.max(self.g).max(self.b)
     }
-    // itertools calls this the "cartesian product", where the series is (0,0,0),(0,0,1)...(0,0,255),(0,1,0), until (255,255,255)
-    pub fn all_colors() -> impl Iterator<Item = Rgb<u8>> + Clone {
-        iproduct!(0..=255, 0..=255, 0..=255).map(|(r, g, b)| SRgb { r, g, b })
+
+    // itertools calls this the cartesian product: (0,0,0),(0,0,1),...(0,0,255),(0,1,0),...(255,255,254),(255,255,255)
+    pub fn all_colors() -> impl Iterator<Item = sRGB> + Clone {
+        itertools::iproduct!(0..=255, 0..=255, 0..=255).map(|(r, g, b)| sRGB { r, g, b })
     }
 }
 
-impl LRgb {
+impl lRGB {
     // Note: This is not a good way to clamp sRGB colors
     // The .clamp() is only to prevent over/underflows from rounding errors
-    pub fn lrgb_to_srgb(self) -> SRgb {
-        Rgb {
+    pub fn to_srgb(self) -> sRGB {
+        sRGB {
             r: ((255.0 * to_gamma(self.r)).round()).clamp(0.0, 255.0) as u8,
             g: ((255.0 * to_gamma(self.g)).round()).clamp(0.0, 255.0) as u8,
             b: ((255.0 * to_gamma(self.b)).round()).clamp(0.0, 255.0) as u8,
-        }
-    }
-
-    pub fn lrgb_to_oklab(self) -> Oklab {
-        let l = 0.4122214708 * self.r + 0.5363325363 * self.g + 0.0514459929 * self.b;
-        let m = 0.2119034982 * self.r + 0.6806995451 * self.g + 0.1073969566 * self.b;
-        let s = 0.0883024619 * self.r + 0.2817188376 * self.g + 0.6299787005 * self.b;
-        let l_ = l.cbrt();
-        let m_ = m.cbrt();
-        let s_ = s.cbrt();
-        Oklab {
-            l: 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
-            a: 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
-            b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_,
         }
     }
 
@@ -87,7 +88,7 @@ impl LRgb {
 
 fn to_linear(u: f64) -> f64 {
     if u >= 0.04045 {
-        ((u + 0.055) / (1.055)).powf(2.4)
+        (u.mul_add(200.0, 11.0)).powf(2.4)
     } else {
         u / 12.92
     }
@@ -95,7 +96,7 @@ fn to_linear(u: f64) -> f64 {
 
 fn to_gamma(u: f64) -> f64 {
     if u >= 0.0031308 {
-        1.055 * u.powf(1.0 / 2.4) - 0.055
+        u.powf(1.0 / 2.4).mul_add(1.055, -0.055)
     } else {
         12.92 * u
     }
