@@ -75,8 +75,8 @@ impl Oklab {
         Oklab {
             l: (self
                 .l
-                .mul_add(60.3, -7.519)
-                .mul_add(self.l.mul_add(60.3, -7.519), 56.015520)
+                .mul_add(30.15, -7.519)
+                .mul_add(120.6 * self.l, 112.550881)
                 .sqrt()
                 + 60.3 * self.l)
                 .mul_add(1.0 / 103.0, -0.103),
