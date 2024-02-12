@@ -22,12 +22,12 @@ pub struct Oklch {
 
 impl std::fmt::Display for Oklab {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {}, {})", self.l, self.a, self.b)
+        write!(f, "Oklab({}, {}, {})", self.l, self.a, self.b)
     }
 }
 impl std::fmt::Display for Oklch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {}, {})", self.l, self.c, self.h)
+        write!(f, "Oklch({}, {}, {})", self.l, self.c, self.h)
     }
 }
 
@@ -71,7 +71,7 @@ impl Oklab {
     /// Ottoson developed this D65 lightness estimate for use in a color picker, which is supposed to show all colors under a single hue.
     ///
     /// I'm unsure whether I should use this when iterating through all sRGB colors, as Oklab is a transformation of sRGB, but sRGB has the D65 white point.
-    pub fn to_d65_reference(self) -> Oklab {
+    pub fn to_d65_white(self) -> Oklab {
         Oklab {
             l: (self
                 .l
@@ -84,7 +84,7 @@ impl Oklab {
             ..self
         }
     }
-    pub fn to_unreference(self) -> Oklab {
+    pub fn to_unreferenced_white(self) -> Oklab {
         Oklab {
             l: (self.l.mul_add(51.5, 10.609) / self.l.recip().mul_add(1.809, 60.3)),
             d65_reference_l: false,
@@ -288,5 +288,18 @@ impl rgb::lRGB {
     }
     pub fn to_oklch(self) -> Oklch {
         self.to_oklab().to_oklch()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn to_srgb_and_back() {
+        assert_eq!(
+            crate::sRGB::all_colors().collect::<Vec<_>>(),
+            crate::sRGB::all_colors()
+                .map(|srgb| srgb.to_oklab().to_oklch().to_oklab().to_srgb())
+                .collect::<Vec<_>>()
+        );
     }
 }

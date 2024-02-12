@@ -23,13 +23,13 @@ pub struct lRGB {
 impl std::fmt::Display for sRGB {
     /// Display as an sRGB tuple: `(123, 45, 6)`.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {}, {})", self.r, self.g, self.b)
+        write!(f, "sRGB({}, {}, {})", self.r, self.g, self.b)
     }
 }
 impl std::fmt::Display for lRGB {
     /// Display as an lRGB tuple: `(0.123, 0.45, 0.6)`.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {}, {})", self.r, self.g, self.b)
+        write!(f, "lRGB({}, {}, {})", self.r, self.g, self.b)
     }
 }
 
