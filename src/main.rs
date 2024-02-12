@@ -26,7 +26,7 @@ fn main() {
         sRGB::all_colors()
             .par_bridge()
             .filter(|srgb| {
-                srgb.to_oklab().to_d65_reference().delta_e(Oklab {
+                srgb.to_oklab().to_d65_reference().delta_E_ab(Oklab {
                     l: 0.0,
                     a: 0.0,
                     b: 0.0,
@@ -40,7 +40,7 @@ fn main() {
 
                 let all_deltas = test_colors
                     .permutations(2)
-                    .map(|vector| vector[0].delta_e(vector[1]));
+                    .map(|vector| vector[0].delta_E_ab(vector[1]));
 
                 // TODO: find a good averaging method
                 let delta = all_deltas.map(|delta: f64| delta.ln()).sum::<f64>();
@@ -118,7 +118,7 @@ geometric mean for delta (just logarithmic sum)
 
 
 haven't read the code after refactor to see what the following is supposed to be
-(255, 255, 255), (148, 148, 148), 65756513.23311
+(255, 255, 255), (148, 148, 148), 65756511.31290
 (255, 0, 255), (122, 66, 120), 0.46980
 (0, 255, 0), (86, 136, 82), 0.18435
 (6, 54, 255), (27, 49, 101), 0.09759
@@ -126,5 +126,5 @@ haven't read the code after refactor to see what the following is supposed to be
 (255, 255, 0), (144, 146, 95), 0.03772
 (0, 135, 0), (41, 69, 39), 0.02673
 (137, 0, 255), (67, 48, 106), 0.01968
-Total time: 60.789s
+Total time: 62.921s
 */

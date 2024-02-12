@@ -1,9 +1,10 @@
-// Implementation from the rgb crate, modified for personal use
-#![allow(non_camel_case_types)]
-
-use itertools;
+#![allow(dead_code)]
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+/// Implementation of RGB colors from the `rgb`` crate, modified for personal use.
+///
+/// Standard RGB color.
+#[allow(non_camel_case_types)]
 pub struct sRGB {
     pub r: u8,
     pub g: u8,
@@ -11,6 +12,8 @@ pub struct sRGB {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+/// Linear light RGB color.
+#[allow(non_camel_case_types)]
 pub struct lRGB {
     pub r: f64,
     pub g: f64,
@@ -18,23 +21,27 @@ pub struct lRGB {
 }
 
 impl std::fmt::Display for sRGB {
+    /// Display as an sRGB tuple: `(123, 45, 6)`.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {}, {})", self.r, self.g, self.b)
     }
 }
 impl std::fmt::Display for lRGB {
+    /// Display as an lRGB tuple: `(0.123, 0.45, 0.6)`.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {}, {})", self.r, self.g, self.b)
     }
 }
 
 impl Default for sRGB {
+    /// Default to pure black: `(0, 0, 0)`.
     fn default() -> sRGB {
         sRGB { r: 0, g: 0, b: 0 }
     }
 }
 
 impl Default for lRGB {
+    /// Default to pure black: `(0.0, 0.0, 0.0)`.
     fn default() -> lRGB {
         lRGB {
             r: 0.0,
@@ -47,9 +54,9 @@ impl Default for lRGB {
 impl sRGB {
     pub fn to_lrgb(self) -> lRGB {
         lRGB {
-            r: to_linear(self.r as f64 / 255.0),
-            g: to_linear(self.g as f64 / 255.0),
-            b: to_linear(self.b as f64 / 255.0),
+            r: linearize(self.r as f64 / 255.0),
+            g: linearize(self.g as f64 / 255.0),
+            b: linearize(self.b as f64 / 255.0),
         }
     }
 
@@ -60,8 +67,8 @@ impl sRGB {
         self.r.max(self.g).max(self.b)
     }
 
-    // itertools calls this the cartesian product: (0,0,0),(0,0,1),...(0,0,255),(0,1,0),...(255,255,254),(255,255,255)
     pub fn all_colors() -> impl Iterator<Item = sRGB> + Clone {
+        // itertools calls this the cartesian product: (0,0,0),(0,0,1),...(0,0,255),(0,1,0),...(255,255,254),(255,255,255)
         itertools::iproduct!(0..=255, 0..=255, 0..=255).map(|(r, g, b)| sRGB { r, g, b })
     }
 }
@@ -71,9 +78,9 @@ impl lRGB {
     // The .clamp() is only to prevent over/underflows from rounding errors
     pub fn to_srgb(self) -> sRGB {
         sRGB {
-            r: ((255.0 * to_gamma(self.r)).round()).clamp(0.0, 255.0) as u8,
-            g: ((255.0 * to_gamma(self.g)).round()).clamp(0.0, 255.0) as u8,
-            b: ((255.0 * to_gamma(self.b)).round()).clamp(0.0, 255.0) as u8,
+            r: ((255.0 * gamma(self.r)).round()).clamp(0.0, 255.0) as u8,
+            g: ((255.0 * gamma(self.g)).round()).clamp(0.0, 255.0) as u8,
+            b: ((255.0 * gamma(self.b)).round()).clamp(0.0, 255.0) as u8,
         }
     }
 
@@ -86,15 +93,17 @@ impl lRGB {
     }
 }
 
-fn to_linear(u: f64) -> f64 {
+/// Undoes gamma correction to convert from sRGB to lRGB
+fn linearize(u: f64) -> f64 {
     if u >= 0.04045 {
-        (u.mul_add(200.0, 11.0) / 211.0).powf(2.4)
+        ((u + 0.055) / 1.055).powf(2.4)
     } else {
         u / 12.92
     }
 }
 
-fn to_gamma(u: f64) -> f64 {
+/// Applies gamma correction to convert from lRGB to sRGB
+fn gamma(u: f64) -> f64 {
     if u >= 0.0031308 {
         u.powf(1.0 / 2.4).mul_add(1.055, -0.055)
     } else {
