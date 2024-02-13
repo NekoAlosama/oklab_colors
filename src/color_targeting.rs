@@ -12,13 +12,15 @@ pub fn main() {
     //let limits = (0..=255).map(|x| sRGB { r: x, g: x, b: x });
     let limits = sRGB::all_colors();
 
-    let oklab_colors = limits.par_bridge().map(|srgb_color| srgb_color.to_oklab());
+    let oklab_colors = limits
+        .par_bridge()
+        .map(|srgb_color| srgb_color.to_oklab().to_d65_white());
 
     oklab_colors
         .clone()
         .filter(|color| {
-            color.delta_E_ab(crate::Oklab::BLACK) <= 0.50136
-                && color.delta_E_ab(crate::Oklab::WHITE) <= 0.50136
+            color.delta_E_ab(crate::Oklab::BLACK) <= 0.5006
+                && color.delta_E_ab(crate::Oklab::WHITE) <= 0.5006
         })
         .for_each(|original| {
             let max_delta = oklab_colors
@@ -31,10 +33,10 @@ pub fn main() {
 
             if max_delta < *locked_saved_delta {
                 *locked_saved_delta = max_delta;
-                *locked_saved_color = original.to_srgb();
+                *locked_saved_color = original.to_unreferenced_white().to_srgb();
                 println!(
                     "New best: {} / {}, {max_delta}",
-                    original.to_srgb(),
+                    original.to_unreferenced_white().to_srgb(),
                     original.to_oklch()
                 );
             }
@@ -82,8 +84,16 @@ saved_delta: Mutex { data: 0.5004875511845575 }
 Total time: 174.7414537
 
 any color, uses delta_E_ab, unreferenced white:
-filtered to 0.50136 below BLACK and WHITE
-New best: sRGB(91, 104, 83) / Oklch(0.4999566265134218, 0.036181219226393994, 2.33159869341448), 0.5013506233326213
-error: process didn't exit successfully: `target\release\contrasting_colors.exe` (exit code: 0xc000013a, STATUS_CONTROL_C_EXIT)
-^C
+filtered to 0.5013 below BLACK and WHITE
+New best: sRGB(106, 99, 77) / Oklch(0.4999524894905842, 0.034403377521218005, 1.6144679183027821), 0.5012295841851826
+saved_color: Mutex { data: sRGB { r: 106, g: 99, b: 77 } }
+saved_delta: Mutex { data: 0.5012295841851826 }
+Total time: 424.2191319
+
+any color, uses delta_E_ab, D65 white:
+filtered to 0.5006 below BLACK and WHITE
+New best: sRGB(121, 120, 104) / Oklch(0.5000038657116537, 0.023873913221130267, 1.8186434009827999), 0.5005735005561995
+saved_color: Mutex { data: sRGB { r: 121, g: 120, b: 104 } }
+saved_delta: Mutex { data: 0.5005735005561995 }
+Total time: 92.8795022
  */
