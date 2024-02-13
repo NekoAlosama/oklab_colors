@@ -142,7 +142,8 @@ impl Oklab {
     /// Highest delta_E_Hyab generated from pure black vs. pure yellow.
     #[allow(non_snake_case)]
     pub fn delta_E_Hyab(self, other: Oklab) -> f64 {
-        (self.l - other.l).abs() + self.chroma()
+        (self.l - other.l).abs()
+            + ((self.a - other.a).mul_add(self.a - other.a, (self.b - other.b).powi(2))).sqrt()
     }
 
     pub fn to_oklch(self) -> Oklch {
@@ -296,8 +297,8 @@ mod tests {
     #[test]
     fn to_srgb_and_back() {
         assert_eq!(
-            crate::sRGB::all_colors().collect::<Vec<_>>(),
-            crate::sRGB::all_colors()
+            crate::rgb::sRGB::all_colors().collect::<Vec<_>>(),
+            crate::rgb::sRGB::all_colors()
                 .map(|srgb| srgb.to_oklab().to_oklch().to_oklab().to_srgb())
                 .collect::<Vec<_>>()
         );
