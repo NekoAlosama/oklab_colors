@@ -1,7 +1,7 @@
-mod color_targeting;
 mod oklab;
+mod opposing_colors;
 mod rgb;
 
 fn main() {
-    color_targeting::main();
+    opposing_colors::main();
 }

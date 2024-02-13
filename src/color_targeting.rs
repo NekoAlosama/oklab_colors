@@ -1,7 +1,7 @@
 use crate::{oklab::Oklab, rgb::*};
 use parking_lot::Mutex;
-use rayon::prelude::*;
 use rand::prelude::*;
+use rayon::prelude::*;
 
 pub fn main() {
     // Time for benchmarking purposes
@@ -11,11 +11,13 @@ pub fn main() {
     let saved_color = Mutex::new(sRGB::default());
     let saved_delta = Mutex::new(f64::INFINITY);
 
-    //let limits = (0..=255).map(|x| sRGB { r: x, g: x, b: x });
+    //let mut limits = (0..=255).map(|x| sRGB { r: x, g: x, b: x }).collect::<Vec<_>>();
     let mut limits = sRGB::all_colors().collect::<Vec<_>>();
     limits.shuffle(&mut rng);
 
-    let oklab_colors = limits.iter().par_bridge().map(|srgb_color| srgb_color.to_oklab());
+    let oklab_colors = limits
+        .par_iter()
+        .map(|srgb_color| srgb_color.to_oklab());
 
     oklab_colors
         .clone()
@@ -61,7 +63,7 @@ saved_delta: Mutex { data: 0.5003044439510853 }
 Total time: 0.0036186
 
 all colors, randomized:
-New best: sRGB(119, 128, 126) / Oklch(0.5917254454633886, 0.011096808439379767, -3.1212383372041934), 0.6028222539027683
+New best: sRGB(100, 106, 46) / Oklch(0.5052858202334924, 0.08318629259636254, 1.9921287993807313), 0.5909153702990775
 error: process didn't exit successfully: `target\release\contrasting_colors.exe` (exit code: 0xc000013a, STATUS_CONTROL_C_EXIT)
 ^C
 */

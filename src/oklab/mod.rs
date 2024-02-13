@@ -140,6 +140,7 @@ impl Oklab {
     /// Shown to provide better agreement on colors with high difference values for CIELAB.
     ///
     /// Highest delta_E_Hyab generated from pure black vs. pure yellow.
+    // I wonder how delta_l + delta_c is compared to delta_l + sqrt(delta_a^2 + delta_b^2)
     #[allow(non_snake_case)]
     pub fn delta_E_Hyab(self, other: Oklab) -> f64 {
         (self.l - other.l).abs()
