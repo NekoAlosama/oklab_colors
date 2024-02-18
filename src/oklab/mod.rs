@@ -108,7 +108,12 @@ impl Oklab {
     /// In this case, `self.delta_e_ab(Oklab::BLACK)` is considered to be chroma and lightness combined.
     /// Note that there isn't a definition for "relative lightness".
     pub fn saturation(self) -> f64 {
-        self.chroma() / self.delta_E_ab(Oklab::BLACK)
+        self.chroma()
+            / (if self.d65_reference_l {
+                self.delta_E_ab(Oklab::BLACK.to_d65_white())
+            } else {
+                self.delta_E_ab(Oklab::BLACK)
+            })
     }
 
     /// Not to be confused with delta lowercase h, meaning difference in hue angles.
@@ -184,7 +189,7 @@ impl Oklab {
     /// Finds the sRGB value that is closest to the given Oklab. Very slow.
     pub fn to_srgb_closest(self) -> rgb::sRGB {
         // Early exit; should work
-        if (self.to_lrgb().min() >= 0.0_f64) && self.to_lrgb().max() <= 1.0_f64 {
+        if (rgb::gamma(self.to_lrgb().min()) >= 0.0_f64) && rgb::gamma(self.to_lrgb().max()) <= 1.0_f64 {
             return self.to_srgb();
         }
 

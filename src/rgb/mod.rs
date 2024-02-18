@@ -94,7 +94,7 @@ impl lRGB {
 }
 
 /// Undoes gamma correction to convert from sRGB to lRGB
-fn linearize(u: f64) -> f64 {
+pub fn linearize(u: f64) -> f64 {
     if u >= 0.04045 {
         ((u + 0.055) / 1.055).powf(2.4)
     } else {
@@ -103,7 +103,7 @@ fn linearize(u: f64) -> f64 {
 }
 
 /// Applies gamma correction to convert from lRGB to sRGB
-fn gamma(u: f64) -> f64 {
+pub fn gamma(u: f64) -> f64 {
     if u >= 0.0031308 {
         u.powf(1.0 / 2.4).mul_add(1.055, -0.055)
     } else {

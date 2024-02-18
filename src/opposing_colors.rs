@@ -12,9 +12,7 @@ pub fn main() {
     for _ in 1..=9 {
         let saved_delta = Mutex::new(f64::NEG_INFINITY);
         let saved_color = Mutex::new(sRGB::default());
-        let starting_colors = saved_colors
-            .iter()
-            .map(|color| color.to_oklab());
+        let starting_colors = saved_colors.iter().map(|color| color.to_oklab());
 
         sRGB::all_colors().par_bridge().for_each(|test_srgb| {
             let all_combos = starting_colors
@@ -73,10 +71,13 @@ Total time: 104.289s
 
 Hyab min, D65 white
 sRGB(255, 255, 0), sRGB(158, 160, 109), 1.17371
+
 sRGB(211, 0, 255), sRGB(114, 70, 127), 0.88753
 sRGB(0, 128, 0), sRGB(50, 77, 47), 0.62036
+
 sRGB(2, 0, 201), sRGB(21, 40, 86), 0.54520
 sRGB(0, 203, 255), sRGB(87, 125, 141), 0.51915
+
 sRGB(255, 109, 0), sRGB(135, 91, 71), 0.43797
 sRGB(158, 0, 82), sRGB(82, 42, 55), 0.41752
 sRGB(68, 117, 204), sRGB(63, 79, 105), 0.33563
