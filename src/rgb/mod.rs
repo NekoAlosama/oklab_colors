@@ -67,7 +67,7 @@ impl sRGB {
         self.r.max(self.g).max(self.b)
     }
 
-    pub fn all_colors() -> impl Iterator<Item = sRGB> + Clone {
+    pub fn all_colors() -> impl Iterator<Item = sRGB> + Clone + Send {
         // itertools calls this the cartesian product: (0,0,0),(0,0,1),...(0,0,255),(0,1,0),...(255,255,254),(255,255,255)
         itertools::iproduct!(0..=255, 0..=255, 0..=255).map(|(r, g, b)| sRGB { r, g, b })
     }
@@ -108,5 +108,34 @@ pub fn gamma(u: f64) -> f64 {
         u.powf(1.0 / 2.4).mul_add(1.055, -0.055)
     } else {
         12.92 * u
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::rgb;
+
+    #[test]
+    fn gamma_to_linear() {
+        let test = 0.5_f64;
+        assert!(rgb::gamma(rgb::linearize(test)) - 0.5 < 1e-6);
+    }
+
+    #[test]
+    fn srgb_to_lrgb() {
+        assert_eq!(
+            rgb::sRGB {
+                r: 255,
+                g: 128,
+                b: 127
+            },
+            (rgb::sRGB {
+                r: 255,
+                g: 128,
+                b: 127
+            })
+            .to_lrgb()
+            .to_srgb()
+        );
     }
 }

@@ -6,13 +6,13 @@ use rayon::prelude::*;
 pub fn main() {
     // Time for benchmarking purposes
     let start_time = std::time::SystemTime::now();
-    let mut rng = rand::thread_rng();
 
     let saved_color = Mutex::new(sRGB::default());
     let saved_delta = Mutex::new(f64::NEG_INFINITY);
 
     //let mut limits = (0..=255).map(|x| sRGB { r: x, g: x, b: x }).collect::<Vec<_>>();
     let mut limits = sRGB::all_colors().collect::<Vec<_>>();
+    let mut rng = rand::thread_rng();
     limits.shuffle(&mut rng);
 
     let oklab_colors = limits.par_iter().map(|srgb_color| srgb_color.to_oklab());

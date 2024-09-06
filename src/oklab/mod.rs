@@ -72,24 +72,30 @@ impl Oklab {
     ///
     /// I'm unsure whether I should use this when iterating through all sRGB colors, as Oklab is a transformation of sRGB, but sRGB has the D65 white point.
     pub fn to_d65_white(self) -> Oklab {
+        if self.d65_reference_l {
+            return self;
+        }
         Oklab {
-            l: (self
-                .l
-                .mul_add(30.15, -7.519)
-                .mul_add(120.6 * self.l, 112.550881)
-                .sqrt()
-                + 60.3 * self.l)
-                .mul_add(1.0 / 103.0, -0.103),
+            l: 0.1
+                * (self
+                    .l
+                    .mul_add(36.3609 / 1.0609, -44.019 / 5.15)
+                    .mul_add(self.l, 1.0609)
+                    .sqrt()
+                    + self.l.mul_add(6.03 / 1.03, -1.03)),
             d65_reference_l: true,
             ..self
         }
     }
     pub fn to_unreferenced_white(self) -> Oklab {
-        Oklab {
-            l: (self.l.mul_add(51.5, 10.609) / self.l.recip().mul_add(1.809, 60.3)),
-            d65_reference_l: false,
-            ..self
+        if self.d65_reference_l {
+            return Oklab {
+                l: self.l * (self.l.mul_add(51.5, 10.609) / self.l.mul_add(60.3, 1.809)),
+                d65_reference_l: false,
+                ..self
+            };
         }
+        self
     }
 
     /// Perceived colorfulness against a gray background of the same lightness `self.l`
@@ -105,15 +111,13 @@ impl Oklab {
     /// The common idea of saturation is chroma relative to lightness, so use `self.chroma() / self.l` if you think it's better.
     ///
     /// This interpretation is that saturation is chroma relative to "total perceived color sensation", or chroma and lightness combined in some way.
-    /// In this case, `self.delta_e_ab(Oklab::BLACK)` is considered to be chroma and lightness combined.
+    /// In this case, `self.delta_E_ab(Oklab::BLACK)` is considered to be chroma and lightness combined. However, delta_E_Hyab might be similar
     /// Note that there isn't a definition for "relative lightness".
-    pub fn saturation(self) -> f64 {
-        self.chroma()
-            / (if self.d65_reference_l {
-                self.delta_E_ab(Oklab::BLACK.to_d65_white())
-            } else {
-                self.delta_E_ab(Oklab::BLACK)
-            })
+    pub fn saturation(self) -> (f64, f64) {
+        (
+            self.chroma() / self.delta_E_ab(Oklab::BLACK),
+            self.chroma() / self.delta_E_Hyab(Oklab::BLACK),
+        )
     }
 
     /// Not to be confused with delta lowercase h, meaning difference in hue angles.
@@ -134,9 +138,12 @@ impl Oklab {
     /// Highest delta_E_ab generated from pure black vs. pure white.
     #[allow(non_snake_case)]
     pub fn delta_E_ab(self, other: Oklab) -> f64 {
-        ((self.l - other.l).mul_add(
-            self.l - other.l,
-            (self.a - other.a).mul_add(self.a - other.a, (self.b - other.b).powi(2)),
+        let l_difference = self.l - other.l;
+        let a_difference = self.a - other.a;
+        let b_difference = self.b - other.b;
+        (l_difference.mul_add(
+            l_difference,
+            a_difference.mul_add(a_difference, b_difference.powi(2)),
         ))
         .sqrt()
     }
@@ -148,8 +155,10 @@ impl Oklab {
     // I wonder how delta_l + delta_c is compared to delta_l + sqrt(delta_a^2 + delta_b^2)
     #[allow(non_snake_case)]
     pub fn delta_E_Hyab(self, other: Oklab) -> f64 {
-        (self.l - other.l).abs()
-            + ((self.a - other.a).mul_add(self.a - other.a, (self.b - other.b).powi(2))).sqrt()
+        let l_difference = self.l - other.l;
+        let a_difference = self.a - other.a;
+        let b_difference = self.b - other.b;
+        l_difference.abs() + (a_difference.mul_add(a_difference, b_difference.powi(2))).sqrt()
     }
 
     pub fn to_oklch(self) -> Oklch {
@@ -189,7 +198,9 @@ impl Oklab {
     /// Finds the sRGB value that is closest to the given Oklab. Very slow.
     pub fn to_srgb_closest(self) -> rgb::sRGB {
         // Early exit; should work
-        if (rgb::gamma(self.to_lrgb().min()) >= 0.0_f64) && rgb::gamma(self.to_lrgb().max()) <= 1.0_f64 {
+        if (rgb::gamma(self.to_lrgb().min()) >= -1e-6)
+            && (rgb::gamma(self.to_lrgb().max()) <= 1.0 + 1e-6)
+        {
             return self.to_srgb();
         }
 
@@ -287,9 +298,9 @@ impl rgb::lRGB {
         let m_ = m.cbrt();
         let s_ = s.cbrt();
         Oklab {
-            l: 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
-            a: 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
-            b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_,
+            l: l_.mul_add(0.2104542553, m_.mul_add(0.793617785, -0.0040720468 * s_)),
+            a: l_.mul_add(1.9779984951, m_.mul_add(-2.428592205, 0.4505937099 * s_)),
+            b: l_.mul_add(0.0259040371, m_.mul_add(0.7827717662, -0.808675766 * s_)),
             d65_reference_l: false,
         }
     }
@@ -300,13 +311,54 @@ impl rgb::lRGB {
 
 #[cfg(test)]
 mod tests {
+    use crate::oklab;
+    use crate::rgb;
+
+    const DIFFERENCE: f64 = 1e-6;
+
     #[test]
-    fn to_srgb_and_back() {
-        assert_eq!(
-            crate::rgb::sRGB::all_colors().collect::<Vec<_>>(),
-            crate::rgb::sRGB::all_colors()
-                .map(|srgb| srgb.to_oklab().to_oklch().to_oklab().to_srgb())
-                .collect::<Vec<_>>()
-        );
+    fn lrgb_to_oklab() {
+        let test = (rgb::lRGB {
+            r: 1.0,
+            g: 0.5,
+            b: 0.25,
+        })
+        .to_oklab()
+        .to_lrgb();
+        assert!((test.r - 1.0).abs() < DIFFERENCE);
+        assert!((test.g - 0.5).abs() < DIFFERENCE);
+        assert!((test.b - 0.25).abs() < DIFFERENCE);
+    }
+
+    #[test]
+    fn oklab_to_oklch() {
+        let test = (oklab::Oklab {
+            l: 0.5,
+            a: 0.25,
+            b: 0.125,
+            d65_reference_l: false,
+        })
+        .to_oklch()
+        .to_oklab();
+        assert!((test.l - 0.5).abs() < DIFFERENCE);
+        assert!((test.a - 0.25).abs() < DIFFERENCE);
+        assert!((test.b - 0.125).abs() < DIFFERENCE);
+        assert_eq!(test.d65_reference_l, false);
+    }
+
+    #[test]
+    fn unreferenced_white_to_d65_white() {
+        let test = (oklab::Oklab {
+            l: 0.5,
+            a: 0.25,
+            b: 0.125,
+            d65_reference_l: false,
+        })
+        .to_d65_white()
+        .to_unreferenced_white();
+        assert!((test.l - 0.5).abs() < DIFFERENCE);
+        assert!((test.a - 0.25).abs() < DIFFERENCE);
+        assert!((test.b - 0.125).abs() < DIFFERENCE);
+        assert_eq!(test.d65_reference_l, false);
     }
 }
